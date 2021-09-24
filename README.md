@@ -10,3 +10,6 @@ To run these, first compile both programs. Then you can call them like this:
 and you should see a figure of whatever STL model you are projecting: orand then you can run
 
 `dc, mag, lib_angle, surface = NFD_Lib(xout,yout,1024)` to generate the NFD library variables.
+
+
+To create an environment: `conda env create -f environment.yml`
