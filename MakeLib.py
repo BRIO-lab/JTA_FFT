@@ -13,7 +13,6 @@ from scipy.interpolate import splprep, splev
 import matplotlib.pyplot as plt
 
 def MakeLib (CalFile,STLFile):
-
     plt.clf()
 
 # Setup NFD library config contours represented by 128 samples
