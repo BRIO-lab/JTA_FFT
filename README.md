@@ -32,4 +32,4 @@ Place the following code in the example call file you created:
 
 `dc, mag, lib_angle, surface = NFD_Lib(xout,yout,1024)` <- This line generates the NFD library variables
 
-Once your call file is created, simply go into your powershell, navigate to the location of the call file, and run the command `python [$CALL_FILE_NAME].py`
+Once your call file is created, simply go into your powershell, navigate to the location of the call file, and run the command `python [$CALL_FILE_NAME_HERE].py`
