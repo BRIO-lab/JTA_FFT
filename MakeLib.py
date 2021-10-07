@@ -20,18 +20,21 @@ class JTA_FFT ():
 
         #self.lib_config = lib_config
 
-        
-            
-
     def MakeLib (self):
         plt.clf()
 
+    # truncate the contents of the text file that stores outputted data
+        txtFile = open(r"output_data.txt","w")
+        txtFile.truncate(0)
+        txtFile.write("row, column, x rotation, y rotation\n")
+        txtFile.close()
+
     # Setup NFD library config contours represented by 128 samples
         nsamp = 128         # Normalized contours represented by 128 samples
-        xrotmax = 2        # X rotation max in degrees - assumes library will be symmetric +/-
-        xrotinc = 1        # x rotation increment in degrees
-        yrotmax = 2        # y rotation max in degrees - assumes library will be symmetric +/-
-        yrotinc = 1        # y rotation increment in degrees
+        xrotmax = 30        # X rotation max in degrees - assumes library will be symmetric +/-
+        xrotinc = 10        # x rotation increment in degrees
+        yrotmax = 30        # y rotation max in degrees - assumes library will be symmetric +/-
+        yrotinc = 10        # y rotation increment in degrees
         
     # Assume image size is 1024x1024 pixels
         self.imsize = 1024    
@@ -122,7 +125,12 @@ class JTA_FFT ():
             k=0
             for yr in yrot:
                 print(j,k,xr,yr)
-    
+
+            # save the row, column, x rotation, and y rotation into the output text file
+                txtFile = open(r"output_data.txt","a")
+                txtFile.write("%d,%d,%f,%f\n"%(j,k,xr,yr))
+                txtFile.close()
+
             # STL transform model
                 transform = vtk.vtkTransform()
                 transform.PostMultiply()
@@ -143,7 +151,7 @@ class JTA_FFT ():
                 renWin.AddRenderer(renderer)
                 renWin.SetSize(w,h)
                 renWin.Render()
-                        
+
             # Render the scene into a numpy array for openCV processing
                 winToIm = vtk.vtkWindowToImageFilter()
                 winToIm.SetInput(renWin)
@@ -158,9 +166,8 @@ class JTA_FFT ():
                 kernel = np.ones((3,3), np.uint8)
                 binary = cv2.dilate(binary, kernel, iterations=1)   # use dilate/erode to get rid of small spurious gaps
                 binary = cv2.erode(binary, kernel, iterations=1)
-                # Get contours of blob
+            # Get contours of blob
                 contours, hierarchy = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-            
                 smoothened = []
                 done = 0
                 for contour in contours:
@@ -178,7 +185,8 @@ class JTA_FFT ():
                         x_new, y_new = splev(u_new, tck, der=0)
                         # Convert it back to numpy format for opencv to be able to display it
                         plt.plot(x_new,self.imsize-y_new)
-                        plt.show()
+                        # plt.show()
+                        # commented out the line above to skip display window opening.
                         done = 1
                     if done:
                         break
@@ -188,14 +196,18 @@ class JTA_FFT ():
                 k +=1
             j +=1
         return self.xout, self.yout
-        
-#cv2.destroyAllWindows()
 
     def NFD_Lib(self):
         x = self.xout
         y = self.yout
     # Get dimensions of input contours
         r, c, nsamp = np.shape(x)
+
+    # write header for next set of data
+        txtFile = open(r"output_data.txt","a")
+        txtFile.write("dc,mag,lib_angle,surface\n")
+        txtFile.close()
+
     # Set up library variables
 
     #    surface = np.zeros(num_k,nsamp,rxinc,ryinc)  ; Library variables
@@ -259,5 +271,11 @@ class JTA_FFT ():
         max_norms = int(max_norms)
         surface = surface[:,:,0:max_norms,:]
         lib_angle = lib_angle[:,:,0:max_norms]
-        
+
+    # writing the returned data to the output text file
+        txtFile = open(r"output_data.txt","a")
+    # newlines added after commas for readability, remove to allow for easier data processing if needed
+        txtFile.write(str(dc) + ",\n" + str(mag) + ",\n" + str(lib_angle) + ",\n" + str(surface))
+        txtFile.close()
+
         return dc, mag, lib_angle, surface
