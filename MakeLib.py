@@ -195,6 +195,9 @@ class JTA_FFT ():
                 self.yout[j,k,:] = y_new
                 k +=1
             j +=1
+        txtFile = open(r"output_data.txt","a")
+        txtFile.write("xout, yout\n"+str(self.xout)+",\n"+str(self.yout)+"\n")
+        txtFile.close()
         return self.xout, self.yout
 
     def NFD_Lib(self):
