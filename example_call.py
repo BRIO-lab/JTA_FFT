@@ -2,7 +2,7 @@ from MakeLib import JTA_FFT
 
 
 myLib = JTA_FFT('','3D Models/tib/ASCII_KR_left_8_tib.stl')
-
+print("test")
 myLib.MakeLib()
 myLib.NFD_Lib()
 #xout, yout = MakeLib('','3D Models/tib/ASCII_KR_left_8_tib.stl')

@@ -281,4 +281,6 @@ class JTA_FFT ():
         txtFile.write(str(dc) + ",\n" + str(mag) + ",\n" + str(lib_angle) + ",\n" + str(surface))
         txtFile.close()
 
+        np.save("surface.npy",surface)
+
         return dc, mag, lib_angle, surface
