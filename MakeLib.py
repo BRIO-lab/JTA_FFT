@@ -22,6 +22,7 @@ class JTA_FFT ():
 
     def MakeLib (self):
         plt.clf()
+        
 
     # truncate the contents of the text file that stores outputted data
         txtFile = open(r"output_data.txt","w")
@@ -31,10 +32,10 @@ class JTA_FFT ():
 
     # Setup NFD library config contours represented by 128 samples
         nsamp = 128         # Normalized contours represented by 128 samples
-        xrotmax = 30        # X rotation max in degrees - assumes library will be symmetric +/-
-        xrotinc = 10        # x rotation increment in degrees
-        yrotmax = 30        # y rotation max in degrees - assumes library will be symmetric +/-
-        yrotinc = 10        # y rotation increment in degrees
+        xrotmax = 60        # X rotation max in degrees - assumes library will be symmetric +/-
+        xrotinc = 2        # x rotation increment in degrees
+        yrotmax = 60        # y rotation max in degrees - assumes library will be symmetric +/-
+        yrotinc = 2        # y rotation increment in degrees
         
     # Assume image size is 1024x1024 pixels
         self.imsize = 1024    
@@ -45,11 +46,16 @@ class JTA_FFT ():
     # for demo purposes.
     # pd, sc, xo, yo = ReadCalFile(CalFile)
 
-        pd = 1200   # nominal prin dist in mm
-        sc = 0.373  # nominal pixel dimension in mm
-        xo = 0.0    # x offset for principal point
-        yo = 0.0    # y offiset for principal point
+        # pd = 1200   # nominal prin dist in mm
+        # sc = 0.373  # nominal pixel dimension in mm
+        # xo = 0.0    # x offset for principal point
+        # yo = 0.0    # y offiset for principal point
         
+        pd = self.CalFile[0]
+        sc = self.CalFile[3]
+        xo = self.CalFile[1]
+        yo = self.CalFile[2]
+
         isc = 1/sc     # inverse scale
         fx = pd/sc     # scale prin dist into pixel units
         fy = fx        # same prin dist in x,y
@@ -124,7 +130,7 @@ class JTA_FFT ():
         for xr in xrot:
             k=0
             for yr in yrot:
-                print(j,k,xr,yr)
+                #print(j,k,xr,yr)
 
             # save the row, column, x rotation, and y rotation into the output text file
                 txtFile = open(r"output_data.txt","a")
@@ -200,7 +206,7 @@ class JTA_FFT ():
         txtFile.close()
         return self.xout, self.yout
 
-    def NFD_Lib(self):
+    def NFD_Lib(self, dir):
         x = self.xout
         y = self.yout
     # Get dimensions of input contours
@@ -241,7 +247,7 @@ class JTA_FFT ():
                 idx = np.argsort(abs(fcoord))       # sort fft coeffs by magnitude
                 idx = idx[::-1]                     # sort descending
                 num_norms = abs(idx[1]-nsamp/2-1)   # number of normalizations
-                print('Number of normalizations:',num_norms, 'Index',idx[1])
+                #print('Number of normalizations:',num_norms, 'Index',idx[1])
 
                 if num_norms == 0:
                     print('No valid normalizations')
@@ -281,6 +287,6 @@ class JTA_FFT ():
         txtFile.write(str(dc) + ",\n" + str(mag) + ",\n" + str(lib_angle) + ",\n" + str(surface))
         txtFile.close()
 
-        np.save("surface.npy",surface)
+        np.save(dir + "/surface.npy",surface)
 
         return dc, mag, lib_angle, surface
