@@ -5,6 +5,7 @@ Created on Wed Apr  7 09:52:31 2021
 
 @author: SAB
 """
+from numpy.fft.helper import fftshift
 import vtk
 import numpy as np
 import math
@@ -13,15 +14,20 @@ import cv2
 from scipy.interpolate import splprep, splev
 import matplotlib.pyplot as plt
 
-class JTA_FFT ():
-    def __init__ (self, CalFile, STLFile):#, lib_config):
-        self.CalFile = CalFile
-        self.STLFile = STLFile
+class JTA_FFT():
+    def __init__ (self):#, lib_config):
+        abcdefghij = 1
+        nsamp = 128
+        self.nsamp = nsamp
+
+        self.imsize = 1024
 
         #self.lib_config = lib_config
 
-    def MakeLib (self):
+    def MakeLib (self, CalFile, STLFile):
         plt.clf()
+        self.CalFile = CalFile
+        self.STLFile = STLFile
         
 
     # truncate the contents of the text file that stores outputted data
@@ -36,7 +42,7 @@ class JTA_FFT ():
         xrotinc = 3        # x rotation increment in degrees
         yrotmax = 30        # y rotation max in degrees - assumes library will be symmetric +/-
         yrotinc = 3        # y rotation increment in degrees
-        
+        # self.nsamp = nsamp
     # Assume image size is 1024x1024 pixels
         self.imsize = 1024    
         
@@ -288,5 +294,93 @@ class JTA_FFT ():
         # txtFile.close()
 # 
         np.save(dir + "/surface_" + model_type + ".npy",surface)
+
+        return dc, mag, lib_angle, surface
+
+    def create_contour(self,image):
+        print(self.nsamp)
+        kernel = np.ones((3,3), np.uint8)
+        binary = cv2.dilate(image, kernel, iterations=1)   # use dilate/erode to get rid of small spurious gaps
+        binary = cv2.erode(image, kernel, iterations=1)
+        contours, hierarchy = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        smoothened = []
+        done = 0
+        for contour in contours:
+            x,y = contour.T
+        # Convert from numpy arrays to normal arrays
+            x = x.tolist()[0]
+            y = y.tolist()[0]
+            if len(x) > 200:
+                # Resample contour in nsamp equispaced increments using spline interpolation
+                # https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.interpolate.splprep.html
+                tck, u = splprep([x,y], u=None, s=1.0, per=1)
+                # https://docs.scipy.org/doc/numpy-1.10.1/reference/generated/numpy.linspace.html
+                u_new = np.linspace(u.min(), u.max(), self.nsamp)
+                # https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.interpolate.splev.html
+                x_new, y_new = splev(u_new, tck, der=0)
+                # Convert it back to numpy format for opencv to be able to display it
+                # plt.plot(x_new,self.imsize-y_new)
+                # plt.show()
+                # commented out the line above to skip display window opening.
+                done = 1
+            if done:
+                break
+
+        return x_new, y_new
+
+    def get_NFD(self,x,y):
+        nsamp = self.nsamp
+        kmax = 5
+        k_norm = np.array([2,-1,-2,-3,-4])
+
+        # dc      = np.zeros((r,c),dtype='c16')
+        # mag     = np.zeros((r,c))
+        surface = np.zeros((kmax,nsamp),dtype='c16')
+        lib_angle = np.zeros((kmax))
+        index_vect = np.linspace(1,nsamp,nsamp)-nsamp/2
+
+        max_norms = 0
+
+        fcoord = np.fft.fft((x + (self.imsize-y)*1j),nsamp)
+        fcoord = np.fft.fftshift(fcoord)
+
+        dc = (fcoord[int(nsamp/2)])
+        fcoord[int(nsamp/2)] = 0 
+        idx = np.argsort(abs(fcoord))       # sort fft coeffs by magnitude
+        idx = idx[::-1]                     # sort descending
+        num_norms = abs(idx[1]-nsamp/2-1)
+
+        if num_norms == 0:
+            print('No valid normalizations')
+            dc         = 0.0
+            mag        = 0.0
+            surface[:,:] = 0.0
+            lib_angle[:] = 0.0
+            return
+        
+        if num_norms > max_norms:
+            max_norms = num_norms
+
+        mag = abs(fcoord[int(nsamp/2+1)])
+        fcoord = fcoord/mag
+
+        for norm in range(int(num_norms)):
+            k = k_norm[norm]
+            # Compute phase angles of A(1) and A(k)
+            u = np.arctan2(fcoord.imag[int(nsamp/2+1)],fcoord.real[int(nsamp/2+1)])
+            v = np.arctan2(fcoord.imag[int(idx[1])],fcoord.real[int(idx[1])])
+            print('u',u,'v',v)
+            # Save reference angle for library matching - in degrees
+            lib_angle[norm] = ((v-k*u)/(k-1))*180./(math.pi)
+            # Compute complex angle to standardize in-plane rotation and contour starting point
+            angle = ((index_vect - k)*u + (1-index_vect)*v)/(k-1)
+            coeff = np.cos(angle)+np.sin(angle)*1j
+            print('Angle:',angle,'coeff',coeff)
+            # Finish normalization
+            surface[norm,:] = fcoord*coeff
+
+        max_norms = int(max_norms)
+        surface = surface[0:max_norms,:]
+        lib_angle = lib_angle[0:max_norms]
 
         return dc, mag, lib_angle, surface
