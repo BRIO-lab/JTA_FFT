@@ -384,3 +384,25 @@ class JTA_FFT():
         lib_angle = lib_angle[0:max_norms]
 
         return dc, mag, lib_angle, surface
+
+    def estimate_pose(self, unknown_surface, lib_surface):
+        xspan = lib_surface.shape[0]
+        yspan = lib_surface.shape[1]
+        dist = np.empty([xspan,yspan])
+
+
+        for i in range(0,xspan):
+            for j in range(0,yspan):
+                diff = unknown_surface[0,:] - lib_surface[i,j,0,:]
+                #print(diff)
+                #print("TEST TEST" , np.linalg.norm(diff))
+
+                dist[i,j] = np.linalg.norm(diff)
+
+               # dist[i,j] = np.transpose(np.conjugate(diff))
+
+        
+        ordered = np.sort(dist)
+
+        return ordered[0]
+
