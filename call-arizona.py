@@ -24,10 +24,10 @@ for patient_id in os.listdir(HOME_DIR):
 
 
 
-            FFT_fem = JTA_FFT(cal_data,fem_model_path)
-            FFT_fem.MakeLib()
+            FFT_fem = JTA_FFT()
+            FFT_fem.MakeLib(cal_data,fem_model_path,movement_dir)
             FFT_fem.NFD_Lib(movement_dir,"fem")
 
-            FFT_tib = JTA_FFT(cal_data,tib_model_path)
-            FFT_tib.MakeLib()
+            FFT_tib = JTA_FFT()
+            FFT_tib.MakeLib(cal_data,tib_model_path, movement_dir)
             FFT_tib.NFD_Lib(movement_dir,"tib")

@@ -24,7 +24,7 @@ class JTA_FFT():
 
         #self.lib_config = lib_config
 
-    def MakeLib (self, CalFile, STLFile):
+    def MakeLib (self, CalFile, STLFile,dir):
         plt.clf()
         self.CalFile = CalFile
         self.STLFile = STLFile
@@ -132,12 +132,13 @@ class JTA_FFT():
         self.xout = np.zeros((int((2*xrotmax/xrotinc)+1),int((2*yrotmax/yrotinc)+1),nsamp))
         self.yout = np.zeros((int((2*xrotmax/xrotinc)+1),int((2*yrotmax/yrotinc)+1),nsamp))
         
-        j=0
-        for xr in xrot:
-            k=0
-            for yr in yrot:
+        rot_indices = np.empty([xrot.size, yrot.size,2])
+        for j ,xr in enumerate(xrot):
+            
+            for k, yr in enumerate(yrot):
                 #print(j,k,xr,yr)
-
+                rot_indices[j,k,0] = xr
+                rot_indices[j,k,1] = yr
             # save the row, column, x rotation, and y rotation into the output text file
                 # txtFile = open(r"output_data.txt","a")
                 # txtFile.write("%d,%d,%f,%f\n"%(j,k,xr,yr))
@@ -205,11 +206,12 @@ class JTA_FFT():
 
                 self.xout[j,k,:] = x_new
                 self.yout[j,k,:] = y_new
-                k +=1
-            j +=1
+                #k +=1
+            #j +=1
         # txtFile = open(r"output_data.txt","a")
         # txtFile.write("xout, yout\n"+str(self.xout)+",\n"+str(self.yout)+"\n")
         # txtFile.close()
+        np.save(dir + "/rot_indices.npy")
         return self.xout, self.yout
 
     def NFD_Lib(self, dir, model_type):
@@ -293,12 +295,15 @@ class JTA_FFT():
         # txtFile.write(str(dc) + ",\n" + str(mag) + ",\n" + str(lib_angle) + ",\n" + str(surface))
         # txtFile.close()
 # 
-        np.save(dir + "/surface_" + model_type + ".npy",surface)
+        np.save(dir + "/surface" + model_type + ".npy",surface)
+        np.save(dir + "/dc_" + model_type + ".npy",dc)
+        np.save(dir + "/mag_" + model_type + ".npy",mag)
+        np.save(dir + "/lib-angle_" + model_type + ".npy",lib_angle)
 
         return dc, mag, lib_angle, surface
 
     def create_contour(self,image):
-        print(self.nsamp)
+        # print(self.nsamp)
         kernel = np.ones((3,3), np.uint8)
         binary = cv2.dilate(image, kernel, iterations=1)   # use dilate/erode to get rid of small spurious gaps
         binary = cv2.erode(image, kernel, iterations=1)
@@ -390,7 +395,7 @@ class JTA_FFT():
         yspan = lib_surface.shape[1]
         dist = np.empty([xspan,yspan])
 
-
+        
         for i in range(0,xspan):
             for j in range(0,yspan):
                 diff = unknown_surface[0,:] - lib_surface[i,j,0,:]
@@ -402,7 +407,8 @@ class JTA_FFT():
                # dist[i,j] = np.transpose(np.conjugate(diff))
 
         
-        ordered = np.sort(dist)
+        
+        # you want the index of the smallest value (i and j)
 
         return ordered[0]
 
