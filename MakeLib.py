@@ -25,17 +25,17 @@ class JTA_FFT ():
         
 
     # truncate the contents of the text file that stores outputted data
-        txtFile = open(r"output_data.txt","w")
-        txtFile.truncate(0)
-        txtFile.write("row, column, x rotation, y rotation\n")
-        txtFile.close()
-
+        # txtFile = open(r"output_data.txt","w")
+        # txtFile.truncate(0)
+        # txtFile.write("row, column, x rotation, y rotation\n")
+        # txtFile.close()
+# 
     # Setup NFD library config contours represented by 128 samples
         nsamp = 128         # Normalized contours represented by 128 samples
-        xrotmax = 60        # X rotation max in degrees - assumes library will be symmetric +/-
-        xrotinc = 2        # x rotation increment in degrees
-        yrotmax = 60        # y rotation max in degrees - assumes library will be symmetric +/-
-        yrotinc = 2        # y rotation increment in degrees
+        xrotmax = 30        # X rotation max in degrees - assumes library will be symmetric +/-
+        xrotinc = 3        # x rotation increment in degrees
+        yrotmax = 30        # y rotation max in degrees - assumes library will be symmetric +/-
+        yrotinc = 3        # y rotation increment in degrees
         
     # Assume image size is 1024x1024 pixels
         self.imsize = 1024    
@@ -133,10 +133,10 @@ class JTA_FFT ():
                 #print(j,k,xr,yr)
 
             # save the row, column, x rotation, and y rotation into the output text file
-                txtFile = open(r"output_data.txt","a")
-                txtFile.write("%d,%d,%f,%f\n"%(j,k,xr,yr))
-                txtFile.close()
-
+                # txtFile = open(r"output_data.txt","a")
+                # txtFile.write("%d,%d,%f,%f\n"%(j,k,xr,yr))
+                # txtFile.close()
+# 
             # STL transform model
                 transform = vtk.vtkTransform()
                 transform.PostMultiply()
@@ -201,22 +201,22 @@ class JTA_FFT ():
                 self.yout[j,k,:] = y_new
                 k +=1
             j +=1
-        txtFile = open(r"output_data.txt","a")
-        txtFile.write("xout, yout\n"+str(self.xout)+",\n"+str(self.yout)+"\n")
-        txtFile.close()
+        # txtFile = open(r"output_data.txt","a")
+        # txtFile.write("xout, yout\n"+str(self.xout)+",\n"+str(self.yout)+"\n")
+        # txtFile.close()
         return self.xout, self.yout
 
-    def NFD_Lib(self, dir):
+    def NFD_Lib(self, dir, model_type):
         x = self.xout
         y = self.yout
     # Get dimensions of input contours
         r, c, nsamp = np.shape(x)
 
     # write header for next set of data
-        txtFile = open(r"output_data.txt","a")
-        txtFile.write("dc,mag,lib_angle,surface\n")
-        txtFile.close()
-
+        # txtFile = open(r"output_data.txt","a")
+        # txtFile.write("dc,mag,lib_angle,surface\n")
+        # txtFile.close()
+# 
     # Set up library variables
 
     #    surface = np.zeros(num_k,nsamp,rxinc,ryinc)  ; Library variables
@@ -282,11 +282,11 @@ class JTA_FFT ():
         lib_angle = lib_angle[:,:,0:max_norms]
 
     # writing the returned data to the output text file
-        txtFile = open(r"output_data.txt","a")
+        #txtFile = open(r"output_data.txt","a")
     # newlines added after commas for readability, remove to allow for easier data processing if needed
-        txtFile.write(str(dc) + ",\n" + str(mag) + ",\n" + str(lib_angle) + ",\n" + str(surface))
-        txtFile.close()
-
-        np.save(dir + "/surface.npy",surface)
+        # txtFile.write(str(dc) + ",\n" + str(mag) + ",\n" + str(lib_angle) + ",\n" + str(surface))
+        # txtFile.close()
+# 
+        np.save(dir + "/surface_" + model_type + ".npy",surface)
 
         return dc, mag, lib_angle, surface
