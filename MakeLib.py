@@ -15,12 +15,23 @@ from scipy.interpolate import splprep, splev
 import matplotlib.pyplot as plt
 
 class JTA_FFT():
-    def __init__ (self):#, lib_config):
+    def __init__ (self,CalFile):#, lib_config):
         abcdefghij = 1
         nsamp = 128
         self.nsamp = nsamp
 
         self.imsize = 1024
+
+        cal_data = np.loadtxt(CalFile, skiprows=1)
+
+        pd = cal_data[0]
+        sc = cal_data[3]
+        xo = cal_data[1]
+        yo = cal_data[2]
+        self.pd = pd
+        self.xo = xo
+        self.yo = yo
+        self.sc = sc
 
         #self.lib_config = lib_config
 
@@ -28,6 +39,7 @@ class JTA_FFT():
         plt.clf()
         self.CalFile = CalFile
         self.STLFile = STLFile
+        
         
 
     # truncate the contents of the text file that stores outputted data
@@ -61,6 +73,10 @@ class JTA_FFT():
         sc = self.CalFile[3]
         xo = self.CalFile[1]
         yo = self.CalFile[2]
+        self.pd = pd
+        self.xo = xo
+        self.yo = yo
+        self.sc = sc
 
         isc = 1/sc     # inverse scale
         fx = pd/sc     # scale prin dist into pixel units
@@ -211,7 +227,7 @@ class JTA_FFT():
         # txtFile = open(r"output_data.txt","a")
         # txtFile.write("xout, yout\n"+str(self.xout)+",\n"+str(self.yout)+"\n")
         # txtFile.close()
-        np.save(dir + "/rot_indices.npy")
+        np.save(dir + "/rot_indices.npy", rot_indices)
         return self.xout, self.yout
 
     def NFD_Lib(self, dir, model_type):
@@ -295,7 +311,7 @@ class JTA_FFT():
         # txtFile.write(str(dc) + ",\n" + str(mag) + ",\n" + str(lib_angle) + ",\n" + str(surface))
         # txtFile.close()
 # 
-        np.save(dir + "/surface" + model_type + ".npy",surface)
+        np.save(dir + "/surface_" + model_type + ".npy",surface)
         np.save(dir + "/dc_" + model_type + ".npy",dc)
         np.save(dir + "/mag_" + model_type + ".npy",mag)
         np.save(dir + "/lib-angle_" + model_type + ".npy",lib_angle)
@@ -390,25 +406,73 @@ class JTA_FFT():
 
         return dc, mag, lib_angle, surface
 
-    def estimate_pose(self, unknown_surface, lib_surface):
-        xspan = lib_surface.shape[0]
-        yspan = lib_surface.shape[1]
+    def estimate_pose(self,rot_indices, known_dc,known_mag,known_lib_angle,known_surface, uk_dc,uk_mag,uk_libangle,uk_surface):
+        xspan = known_surface.shape[0]
+        yspan = known_surface.shape[1]
         dist = np.empty([xspan,yspan])
 
         
         for i in range(0,xspan):
             for j in range(0,yspan):
-                diff = unknown_surface[0,:] - lib_surface[i,j,0,:]
+                diff = uk_surface[0,:] - known_surface[i,j,0,:]
                 #print(diff)
                 #print("TEST TEST" , np.linalg.norm(diff))
 
                 dist[i,j] = np.linalg.norm(diff)
 
                # dist[i,j] = np.transpose(np.conjugate(diff))
-
         
+        idx,idy = np.where(dist == dist.min())
+
+        x_rot_est = rot_indices[idx,idy,0]
+        y_rot_est = rot_indices[idx,idy,1]
+
+       # z_rot_est = uk_libangle[0] - known_lib_angle[idx,idy,0]
+        z_rot_est = -uk_libangle[0] + known_lib_angle[idx,idy,0]
+        zrot_est_rad = z_rot_est[0]*np.pi/180
+
+        lib_z = 0.1 * self.pd
+
+        #z_trans_est = self.pd - (known_mag[idx,idy]/uk_mag)*(self.pd - (lib_z))
+        z_trans_est = self.pd -(self.pd - lib_z) * (known_mag[idx,idy] / uk_mag)
+
+        #using similar triangles, we can estimate the z translation - look at banks code
+
+        # X and Y translations
+
+        x_trans = 0.5 * self.imsize + (self.xo*self.imsize)/self.sc
+        y_trans = 0.5 * self.imsize + (self.yo*self.imsize)/self.sc
+
+        zoom = (self.pd - lib_z)/(self.pd - z_trans_est)
+
+        x_dc = (known_dc[idx,idy].real - x_trans) * zoom
+        y_dc = (known_dc[idx,idy].imag - y_trans) * zoom
+
+        x_trans_est = (uk_dc.real - x_trans) - (math.cos(zrot_est_rad)*x_dc + math.sin(zrot_est_rad)*y_dc)*self.sc/self.imsize
+        y_trans_est = (uk_dc.imag - y_trans) - (math.sin(zrot_est_rad)*x_dc - math.cos(zrot_est_rad)*y_dc)*self.sc/self.imsize
+
+       # x_trans_est = x_trans_est*(self.pd-lib_z)/(self.pd - z_trans_est)
+       # y_trans_est = y_trans_est*(self.pd-lib_z)/(self.pd - z_trans_est)
+
+        x_est = ((uk_dc.real - x_trans) - (math.cos(zrot_est_rad)*x_dc - math.sin(zrot_est_rad)*y_dc)*zoom)*(self.sc/self.imsize)
+        y_est = ((uk_dc.imag - y_trans) - (math.sin(zrot_est_rad)*x_dc + math.cos(zrot_est_rad)*y_dc)*zoom)*(self.sc/self.imsize)
+
+        z_trans_corr = z_trans_est - self.pd
+
+
+        # compensate for x and y rotations
+
+        phi_x = math.atan2(y_est, (self.pd - z_trans_est))*np.pi/180
+        phi_y = math.atan2(x_est, (self.pd - z_trans_est))*np.pi/180
+
+        x_rot_corr = x_rot_est + math.cos(zrot_est_rad)*phi_x - math.sin(zrot_est_rad)*phi_y
+        y_rot_corr = y_rot_est - math.sin(zrot_est_rad)*phi_x - math.cos(zrot_est_rad)*phi_y
+         
+
+
+        return x_est[0],y_est[0],z_trans_corr[0],z_rot_est[0], x_rot_corr[0], y_rot_corr[0]
         
         # you want the index of the smallest value (i and j)
 
-        return ordered[0]
+        
 
