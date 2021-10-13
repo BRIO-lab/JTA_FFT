@@ -6,6 +6,7 @@ Created on Wed Apr  7 09:52:31 2021
 @author: SAB
 """
 from numpy.fft.helper import fftshift
+from numpy.lib.nanfunctions import _nansum_dispatcher
 import vtk
 import numpy as np
 import math
@@ -263,7 +264,16 @@ class JTA_FFT():
             for j in range(c):
                 x_new = x[i,j,:]
                 y_new = y[i,j,:]
+
+                ###################################
+                ## FIX THIS TO NORMALIZE PROPERLY##
+                ###################################
+                ## norm = "ortho" ## put this into the np.fft.fft call ##
                 fcoord = np.fft.fft((x_new+(self.imsize-y_new)*1j),nsamp)
+
+                ###################################
+                ## FIX THIS TO NORMALIZE PROPERLY##
+                ###################################
                 fcoord = np.fft.fftshift(fcoord)    # shift so DC is in center
     #            dc[i,j] = abs(fcoord[int(nsamp/2)])
                 dc[i,j] = (fcoord[int(nsamp/2)])
@@ -337,6 +347,7 @@ class JTA_FFT():
                 tck, u = splprep([x,y], u=None, s=1.0, per=1)
                 # https://docs.scipy.org/doc/numpy-1.10.1/reference/generated/numpy.linspace.html
                 u_new = np.linspace(u.min(), u.max(), self.nsamp)
+                #u_new = np.linspace(u.min(), u.max(), 64)
                 # https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.interpolate.splev.html
                 x_new, y_new = splev(u_new, tck, der=0)
                 # Convert it back to numpy format for opencv to be able to display it
@@ -351,6 +362,7 @@ class JTA_FFT():
 
     def get_NFD(self,x,y):
         nsamp = self.nsamp
+        
         kmax = 5
         k_norm = np.array([2,-1,-2,-3,-4])
 
@@ -411,6 +423,12 @@ class JTA_FFT():
         yspan = known_surface.shape[1]
         dist = np.empty([xspan,yspan])
 
+        known_dc = known_dc / self.nsamp
+        uk_dc = uk_dc / self.nsamp
+
+        known_mag = known_mag / self.nsamp
+        uk_mag = uk_mag / self.nsamp
+
         
         for i in range(0,xspan):
             for j in range(0,yspan):
@@ -427,8 +445,8 @@ class JTA_FFT():
         x_rot_est = rot_indices[idx,idy,0]
         y_rot_est = rot_indices[idx,idy,1]
 
-       # z_rot_est = uk_libangle[0] - known_lib_angle[idx,idy,0]
-        z_rot_est = -uk_libangle[0] + known_lib_angle[idx,idy,0]
+        z_rot_est = uk_libangle[0] - known_lib_angle[idx,idy,0]
+        #z_rot_est = -uk_libangle[0] + known_lib_angle[idx,idy,0]
         zrot_est_rad = z_rot_est[0]*np.pi/180
 
         lib_z = 0.1 * self.pd
@@ -448,14 +466,25 @@ class JTA_FFT():
         x_dc = (known_dc[idx,idy].real - x_trans) * zoom
         y_dc = (known_dc[idx,idy].imag - y_trans) * zoom
 
-        x_trans_est = (uk_dc.real - x_trans) - (math.cos(zrot_est_rad)*x_dc + math.sin(zrot_est_rad)*y_dc)*self.sc/self.imsize
-        y_trans_est = (uk_dc.imag - y_trans) - (math.sin(zrot_est_rad)*x_dc - math.cos(zrot_est_rad)*y_dc)*self.sc/self.imsize
+        rot = np.array([[math.cos(zrot_est_rad),-math.sin(zrot_est_rad)],[math.sin(zrot_est_rad), math.cos(zrot_est_rad)]])
+        t_input = np.array([[uk_dc.real - x_trans],[uk_dc.imag - y_trans]])
+        t_lib = np.array([[x_dc[0]],[y_dc[0]]])
+        t_est_px = t_input - np.matmul(rot,t_lib)*zoom
+        t_est_mm = t_est_px * self.sc
+        # t_est_mm = t_est_px / 128
+
+        x_est, y_est = t_est_mm
+
+        
+        #x_trans_est = np.array([[uk_dc.real - x_trans],[uk_dc.imag - y_trans]]) - np.matmul()
+        #x_trans_est = (uk_dc.real - x_trans) - (math.cos(zrot_est_rad)*x_dc + math.sin(zrot_est_rad)*y_dc)*self.sc/self.imsize
+        #y_trans_est = (uk_dc.imag - y_trans) - (math.sin(zrot_est_rad)*x_dc - math.cos(zrot_est_rad)*y_dc)*self.sc/self.imsize
 
        # x_trans_est = x_trans_est*(self.pd-lib_z)/(self.pd - z_trans_est)
        # y_trans_est = y_trans_est*(self.pd-lib_z)/(self.pd - z_trans_est)
 
-        x_est = ((uk_dc.real - x_trans) - (math.cos(zrot_est_rad)*x_dc - math.sin(zrot_est_rad)*y_dc)*zoom)*(self.sc/self.imsize)
-        y_est = ((uk_dc.imag - y_trans) - (math.sin(zrot_est_rad)*x_dc + math.cos(zrot_est_rad)*y_dc)*zoom)*(self.sc/self.imsize)
+        #x_est = ((uk_dc.real - x_trans) - (math.cos(zrot_est_rad)*x_dc - math.sin(zrot_est_rad)*y_dc)*zoom)*(self.sc/self.imsize)
+        #y_est = ((uk_dc.imag - y_trans) - (math.sin(zrot_est_rad)*x_dc + math.cos(zrot_est_rad)*y_dc)*zoom)*(self.sc/self.imsize)
 
         z_trans_corr = z_trans_est - self.pd
 
@@ -470,7 +499,7 @@ class JTA_FFT():
          
 
 
-        return x_est[0],y_est[0],z_trans_corr[0],z_rot_est[0], x_rot_corr[0], y_rot_corr[0]
+        return x_est[0],y_est[0],z_trans_corr[0],-1*z_rot_est[0], x_rot_corr[0], y_rot_corr[0]
         
         # you want the index of the smallest value (i and j)
 
