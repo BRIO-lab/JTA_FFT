@@ -332,7 +332,7 @@ class JTA_FFT():
         # print(self.nsamp)
         kernel = np.ones((3,3), np.uint8)
         binary = cv2.dilate(image, kernel, iterations=1)   # use dilate/erode to get rid of small spurious gaps
-        binary = cv2.erode(image, kernel, iterations=1)
+        binary = cv2.erode(binary, kernel, iterations=1)
         contours, hierarchy = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         smoothened = []
         done = 0
