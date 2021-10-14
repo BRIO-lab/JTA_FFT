@@ -271,11 +271,318 @@ class JTA_FFT():
 
     # Centroid of Projection (px)
     # In Banks 96, this is S(0)
-        centroid = np.zeros([r,c],dtype='c16')
+    # Dims: [x-rot, y-rot] - one per projection, unaffected by norms
+        centroid_library = np.zeros([r,c],dtype='c16')
     
     # Magnitude of Projection (px)
     # In Banks 96, this is S(1)
-        mag = np.zeros([r,c])
+    # Dims: [xrot, yrot] - one per projection, unaffected by norms
+        mag_library = np.zeros([r,c])
 
+    # In-plane-rotation angles
+    # Dims: [x-rot, y-rot, norms] - 1 per projection per norm
+        angle_library = np.zeros([r,c,kmax])
+
+    # Fourier Descriptor Library
+    # S(k) in Banks 96
+    # Dims: [x-rot, y-rot, norms, num-samples] - storing full library per norm per projection
+        NFD_library = np.zeros([r,c,kmax,self.nsamp], dtype = 'c16')
+
+    # TODO: find out what the index vectors are
+        index_vect = np.linspace(1,self.nsamp, self.nsamp) - nsamp/2
+
+        max_norms = 0
+    
+    # Loop through each of the dimensions of the rotation indices
+        for i in range(r):
+            for j in range(c):
+                x_new = x[i,j,:]
+                y_new = y[i,j,:]
+
+                
+
+            # Performing Fourier decomp on complex contour variable
+            # y is subtracted from imsize to accunct for image pixel coords
+                # FIXME: Need to fix the way that the FFT works, change norm
+                # norm = "ortho" should do the trick
+                fcoord = np.fft.fft((x_new + (self.imsize-y_new)*1j),nsamp)
+
+            # Shift so that the centroid of the projection is in the center
+                # FIXME: Fix this to normalize properly
+                fcoord = np.fft.fftshift(fcoord)
+
+            # Save the centriod in separate variable and make 0 in NFD
+            # This normalizes NFD position
+                centroid_library[i,j] = (fcoord[int(nsamp/2)])
+                fcoord[int(nsamp/2)] = 0
+
+            # Sort fft coeffs by magnitude
+                idx = np.argsort(abs(fcoord))
+                idx = idx[::-1] # sort descending
+            
+            # Find number of normalizations
+                num_norms = abs(idx[1] - nsamp/2 - 1)
+
+            # Normalizations Check
+                if num_norms == 0:
+                    print('No Valid Normalizations')
+                    break
+
+            # Set Max Norms
+                if num_norms > max_norms:
+                    max_norms = num_norms
+            
+            # Set the magnitude of the projected image
+            # S(1) term in Banks 96
+            # Fcoord starts at negative frequencies, so need to shift to center
+                mag_library[i,j] = abs(fcoord[int(nsamp/2 + 1)])
+
+            # Normalize fcoords by magnitude
+                fcoord = fcoord/mag_library[i,j]
+
+            # Loop through each normalization
+                for norm in range(int(num_norms)):
+                    k = k_norm[norm]
+
+                # Compute the Phase Angles of A(1) and A(k)
+                    u = np.arctan2(
+                        fcoord.imag[int(nsamp/2 + 1)].
+                        fcoord.real[int(nsamp/2 + 1)]
+                    )
+
+                    v = np.arctan2(
+                        fcoord.imag[int(idx[1])],
+                        fcoord.real[int(idx[1])]
+                    )
+
+                # Create reference angle and add to library
+                    angle = ((v - k*u)/(k-1))*180./np.pi
+                    angle_library[i,j,norm] = angle 
+
+                # Compute Complex Angle to standardize in-plane rotation
+                # and contour starting point
+                    ang = ((index_vect - k)*u + (1 - index_vect)*v)/(k-1)
+                    coeff = np.cos(ang) + np.sin(ang)*1j
+
+                # Finish Normalization
+                    NFD_library[i,j,norm,:] = fcoord*coeff
+        
+
+    # Remove the empty portions of the angle and NFD lib for number of norms
+        max_norms = int(max_norms)
+        NFD_library = NFD_library[:,:,:max_norms,:]
+        angle_library = angle_library[:,:,:max_norms]
+
+    # Saving numpy files for each of the pertinent variables
+    # TODO: store these all as a class object using pickle
+    # Storing as pickle would allow them to be stored in a separate class and load properly
+    # For now, saving as .npy files works
+
+        np.save(dir + "/NFD-lib_" + model_type + ".npy", NFD_library)
+        np.save(dir + "/MAG-lib_" + model_type + ".npy", mag_library)
+        np.save(dir + "/ANGLE-lib_" + model_type + ".npy", angle_library)
+        np.save(dir + "/CENTROID-lib_" + model_type + ".npy", centroid_library)
+
+        return centroid_library, mag_library, angle_library, NFD_library
+    
+    def create_contour(self,image):
+
+    # Apply the same dilation and erosion to smooth image
+        kernel = np.ones([3,3], np.uint8)
+        binary = cv2.dilate(image,kernel, iterations = 1)
+        binary = cv2.erode(binary, kernel, iterations = 1)
+
+    # Find the contours of the provided image
+        contours, hierarchy = cv2.findContours(
+            binary, 
+            cv2.RETR_EXTERNAL,
+            cv2.CHAIN_APPROX_NONE)
+        
+        smoothened = []
+        done = 0
+        for contour in contours:
+            x,y = contour.T
+
+        # Convert from Numpy Arrays to Normal Arrays
+            x = x.tolist()[0]
+            y = y.tolist()[0]
+
+            if len(x) > 200:
+                # Resample contour in nsamp equispaced increments using spline interpolation
+                # https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.interpolate.splprep.html
+                tck, u = splprep([x,y], u=None, s=1.0, per=1)
+                # https://docs.scipy.org/doc/numpy-1.10.1/reference/generated/numpy.linspace.html
+                u_new = np.linspace(u.min(), u.max(), self.nsamp)
+                #u_new = np.linspace(u.min(), u.max(), 64)
+                # https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.interpolate.splev.html
+                x_new, y_new = splev(u_new, tck, der=0)
+                # Convert it back to numpy format for opencv to be able to display it
+                # plt.plot(x_new,self.imsize-y_new)
+                # plt.show()
+                # commented out the line above to skip display window opening.
+                done = 1
+            if done:
+                break
+
+        return x_new, y_new
+
+    def get_NFD(self,x,y):
+
+        # This function will create an NFD representation of provided x,y
+        nsamp = self.nsamp
+
+        kmax = 5
+        k_norm = np.array([2, -1, -2, -3, -4])
+
+    # Create an NFD instance for this variable
+    # Dims: [norms, num-samp]
+        NFD_instance = np.zeros([kmax,nsamp])
+
+    # Create an angle instance
+        angle_instance = np.zeros([kmax])
+
+        index_vect = np.linspace(1,nsamp,nsamp) - nsamp/2
+
+        max_norms = 0
+    # FIXME: Need to fix the normalization for the fourier transformation 
+        fcoord = np.fft.fft((x + (self.imsize-y)*1j),nsamp)
+        fcoord = np.fft.fftshift(fcoord)
+
+        centroid_instance = (fcoord[int[nsamp/2]])
+        fcoord[int(nsamp/2)] = 0 
+        idx = np.argsort(abs(fcoord))
+        idx = idx[::-1]
+        num_norms = abs(idx[1]-nsamp/2)
+
+        if num_norms == 0:
+            print('No Valid Normalizations')
+            return
+        
+        if num_norms > max_norms:
+            max_norms = num_norms
+
+        mag_instance = abs(fcoord[int(nsamp/2 + 1)])
+        fcoord = fcoord / mag_instance
+
+        for norm in range(int(num_norms)):
+            k = k_norm[norm]
+        # Compute the Phase Angles of A(1) and A(k)
+            u = np.arctan2(
+                fcoord.imag[int(nsamp/2 + 1)],
+                fcoord.real[int(nsamp/2 + 1)]
+            )
+
+            v = np.arctan2(
+                fcoord.imag[int(idx[1])],
+                fcoord.real[int(idx[1])]
+            )
+
+        # Save the Angle Instance
+            angle_instance[norm] = ((v - k*u)/(k-1))*(180./np.pi)
+            ang = ((index_vect - k)*u + (1 - index_vect)*v)/(k-1)
+            coeff = np.cos(ang) + np.sin(ang)*1j
+            NFD_instance[norm,:] = fcoord*coeff
+
+        max_norms = int(max_norms)
+        NFD_instance = NFD_instance[0:max_norms,:] 
+        angle_instance = angle_instance[0:max_norms]
+
+        return centroid_instance, mag_instance, angle_instance, NFD_instance
+    # TODO: fix the estimate pose to just take in the value of self so that
+    # so many arguements do not need to be passed into the function
+    # make it easier for people to call the function and get the values that they want out 
+    # of it
+    def estimate_pose(
+            self,
+            rot_indices, 
+            centroid_library,  mag_library,  angle_library,  NFD_library,
+            centroid_instance, mag_instance, angle_instance, NFD_instance):
+
+        xspan = NFD_library.shape[0]
+        yspan = NFD_library.shape[1]
+        
+    # Create an empty variable to fill up the distance 
+    # from the instance to each of the library variables
+
+        dist = np.empty([xspan,yspan])
+
+    # TODO: REMOVE THIS ONCE YOU ARE DONE WITH CURRENT TESTING
+    # TODO: the following code adjusts for the incorrect normalization when creating the libs
+    # TODO: this is only a placeholder
+
+        centroid_library = centroid_library / self.nsamp
+        centroid_instance = centroid_instance / self.nsamp
+
+        mag_library = mag_library / self.nsamp
+        mag_instance = mag_instance / self.nsamp
+
+    # Loop through all the indices in the library and check the distance w instance
+        for i in range(0,xspan):
+            for j in range(0,yspan):
+
+            # Compute the difference between the instance and the library
+                diff = NFD_instance[0,:] - NFD_library[i,j,0,:]
+
+            # Take the L2 norm to get the distance
+                dist[i,j] = np.linalg.norm(diff)
+
+        
+    # Find the location of the minimum distance
+        idx,idy = np.where(dist == dist.min())
+
+    # Find the x and y rotation estimates from the library indices
+        x_rot_est = rot_indices[idx,idy,0]
+        y_rot_est = rot_indices[idx,idy,1]
+
+    # Now, find the z-rotation based on the library angle normalizations
+        z_rot_est = angle_instance[0] - angle_library[idx,idy,0]
+        z_rot_rad = z_rot_est * np.pi / 180
+
+    # Set the value of the z-translation of the library
+    # For similar triangles to work, this is measured from the image-plane, not the camera
+    # Calculate the z_est using similar triangles
+        z_lib = 0.1*self.pd
+        z_est = self.pd - (self.pd - z_lib)*(mag_library[idx,idy] / mag_instance)
+
+    # Calculate X and Y translations using the value of the centroid of the non-normalized vector
+    # You also need to adjust for the image center based on camera 
+        x_offset = (0.5 * self.imsize) + (self.xo/self.sc)
+        y_offset = (0.5 * self.imsize) + (self.xo/self.sc)
+
+    # Calculate the zoom based on similar triangles
+        zoom = (self.pd - z_lib)/(self.pd - z_est)
+
+        x_lib = (centroid_library[idx,idy].real - x_offset)*zoom
+        y_lib = (centroid_library[idx,idy].imag - y_offset)*zoom
+
+    # Now, calculate the location of the estimated x and y translation based on centroid and roatation
+
+        rot = np.array([[np.cos(z_rot_rad), -np.sin(z_rot_rad)],
+                        [np.sin(z_rot_rad),  np.cos(z_rot_rad)]])
+        
+        x_inst = centroid_instance.real - x_offset
+        y_inst = centroid_instance.imag - y_offset
+
+        t_inst = np.array([[x_inst],[y_inst]])
+        t_lib  = np.array([[x_lib[0]],[y_lib[0]]])
+
+        t_est_px = t_inst - np.matmul(rot,t_lib)*zoom
+        t_est_len = t_est_px * self.sc
+
+        x_est, y_est = t_est_len
+
+    # Fix the units based on the location of the focal angle. Move z_est based on camera
+        z_est_corr = z_est - self.pd
+
+    # Fix the rotations based on the projective geometry
+        phi_x = np.arctan2(y_est, (self.pd - z_est)) * np.pi/180
+        phi_y = np.arctan2(x_est, (self.pd - z_est)) * np.pi/180
+
+        x_rot_corr = x_rot_est + np.cos(z_rot_rad)*phi_x - np.sin(z_rot_rad)*phi_y
+        y_rot_corr = y_rot_est - np.sin(z_rot_rad)*phi_x - np.cos(z_rot_rad)*phi_y
+
+
+        return x_est[0], y_est[0], z_est_corr[0], -1*z_rot_est[0], x_rot_corr[0], y_rot_corr[0]
     
 
+            
