@@ -406,6 +406,7 @@ class JTA_FFT():
         # Convert from Numpy Arrays to Normal Arrays
             x = x.tolist()[0]
             y = y.tolist()[0]
+            
 
             if len(x) > 200:
                 # Resample contour in nsamp equispaced increments using spline interpolation
@@ -436,7 +437,7 @@ class JTA_FFT():
 
     # Create an NFD instance for this variable
     # Dims: [norms, num-samp]
-        NFD_instance = np.zeros([kmax,nsamp])
+        NFD_instance = np.zeros([kmax,nsamp], dtype='c16')
 
     # Create an angle instance
         angle_instance = np.zeros([kmax])
@@ -448,7 +449,7 @@ class JTA_FFT():
         fcoord = np.fft.fft((x + (self.imsize-y)*1j),nsamp)
         fcoord = np.fft.fftshift(fcoord)
 
-        centroid_instance = (fcoord[int[nsamp/2]])
+        centroid_instance = (fcoord[int(nsamp/2)])
         fcoord[int(nsamp/2)] = 0 
         idx = np.argsort(abs(fcoord))
         idx = idx[::-1]
@@ -482,6 +483,7 @@ class JTA_FFT():
             ang = ((index_vect - k)*u + (1 - index_vect)*v)/(k-1)
             coeff = np.cos(ang) + np.sin(ang)*1j
             NFD_instance[norm,:] = fcoord*coeff
+            
 
         max_norms = int(max_norms)
         NFD_instance = NFD_instance[0:max_norms,:] 
@@ -513,6 +515,7 @@ class JTA_FFT():
         centroid_library = centroid_library / self.nsamp
         centroid_instance = centroid_instance / self.nsamp
 
+
         mag_library = mag_library / self.nsamp
         mag_instance = mag_instance / self.nsamp
 
@@ -537,6 +540,7 @@ class JTA_FFT():
     # Now, find the z-rotation based on the library angle normalizations
         z_rot_est = angle_instance[0] - angle_library[idx,idy,0]
         z_rot_rad = z_rot_est * np.pi / 180
+        z_rot_rad = -1*z_rot_rad
 
     # Set the value of the z-translation of the library
     # For similar triangles to work, this is measured from the image-plane, not the camera
@@ -555,21 +559,25 @@ class JTA_FFT():
         x_lib = (centroid_library[idx,idy].real - x_offset)*zoom
         y_lib = (centroid_library[idx,idy].imag - y_offset)*zoom
 
+
     # Now, calculate the location of the estimated x and y translation based on centroid and roatation
 
-        rot = np.array([[np.cos(z_rot_rad), -np.sin(z_rot_rad)],
-                        [np.sin(z_rot_rad),  np.cos(z_rot_rad)]])
+        rot = np.array([[math.cos(z_rot_rad),-math.sin(z_rot_rad)],
+                        [math.sin(z_rot_rad), math.cos(z_rot_rad)]])
         
         x_inst = centroid_instance.real - x_offset
         y_inst = centroid_instance.imag - y_offset
 
         t_inst = np.array([[x_inst],[y_inst]])
         t_lib  = np.array([[x_lib[0]],[y_lib[0]]])
-
-        t_est_px = t_inst - np.matmul(rot,t_lib)*zoom
+        t_est_px = t_inst - np.matmul(rot,t_lib)
         t_est_len = t_est_px * self.sc
 
         x_est, y_est = t_est_len
+
+
+       # x_est = x_inst - (math.cos(z_rot_rad)*x_lib - math.sin(z_rot_rad)*y_lib)
+    #y_est = y_inst - (math.sin(z_rot_rad)*x_lib + math.cos(z_rot_rad)*y_lib)
 
     # Fix the units based on the location of the focal angle. Move z_est based on camera
         z_est_corr = z_est - self.pd
@@ -583,6 +591,3 @@ class JTA_FFT():
 
 
         return x_est[0], y_est[0], z_est_corr[0], -1*z_rot_est[0], x_rot_corr[0], y_rot_corr[0]
-    
-
-            

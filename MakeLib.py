@@ -466,7 +466,8 @@ class JTA_FFT():
         x_dc = (known_dc[idx,idy].real - x_trans) * zoom
         y_dc = (known_dc[idx,idy].imag - y_trans) * zoom
 
-        rot = np.array([[math.cos(zrot_est_rad),-math.sin(zrot_est_rad)],[math.sin(zrot_est_rad), math.cos(zrot_est_rad)]])
+        rot = np.array([[math.cos(zrot_est_rad),-math.sin(zrot_est_rad)],
+                        [math.sin(zrot_est_rad), math.cos(zrot_est_rad)]])
         t_input = np.array([[uk_dc.real - x_trans],[uk_dc.imag - y_trans]])
         t_lib = np.array([[x_dc[0]],[y_dc[0]]])
         t_est_px = t_input - np.matmul(rot,t_lib)*zoom
