@@ -11,6 +11,7 @@ from vtk.util import numpy_support
 import cv2
 from scipy.interpolate import splprep, splev
 import matplotlib.pyplot as plt
+import pickle
 
 
 class JTA_FFT():
@@ -56,6 +57,17 @@ class JTA_FFT():
         yo = cal_data[2]
         self.xo = xo
         self.yo = yo
+
+        self.params = {'nsamp':self.nsamp, 
+                       'xrotmax': self.xrotmax,
+                       'xrotinc': self.xrotinc,
+                       'yrotmax': self.yrotmax,
+                       'yrotinc': self.yrotinc,
+                       'imsize': self.imsize,
+                       'pd': self.pd,
+                       'sc': self.sc,
+                       'xo': self.xo,
+                       'yo': self.yo}
     
     def Make_Contour_Lib(self,CalFile,STLFile,dir):
 
@@ -383,6 +395,12 @@ class JTA_FFT():
         np.save(dir + "/ANGLE-lib_" + model_type + ".npy", angle_library)
         np.save(dir + "/CENTROID-lib_" + model_type + ".npy", centroid_library)
 
+        self.centroid_library = centroid_library
+        self.mag_library = mag_library
+        self.angle_library = angle_library
+        self.NFD_library = NFD_library
+        self.rot_indices = rot_indices
+
         return centroid_library, mag_library, angle_library, NFD_library
     
     def create_contour(self,image):
@@ -591,3 +609,40 @@ class JTA_FFT():
 
 
         return x_est[0], y_est[0], z_est_corr[0], -1*z_rot_est[0], x_rot_corr[0], y_rot_corr[0]
+
+    def save (self, filename):
+
+        """ 
+            save: saves the entire self to an object with filename defined by the user
+
+            checks: check to make sure that centroid, mag, angle, NFD. etc exist before saving
+                This will make sure that the b=library has been created before trying to save anything
+
+
+        """
+
+    # save the data from self into a pickle
+
+        try:
+            output = open(filename, 'wb')
+            pickle.dump(self.angle_library, output)
+            pickle.dump(self.centroid_library, output)
+            pickle.dump(self.mag_library, output)
+            pickle.dump(self.NFD_library, output)
+            pickle.dump(self.rot_indices, output)
+            pickle.dump(self.params, output)
+        except AttributeError as error:
+            print("Error!", error, "\n You must instantiate all library objects before saving! \n",
+                "Angle Library, Mag Library, NFD Library, Rotation Indices, and Centroid Library!")
+        output.close() 
+
+        if self.angle_library
+
+    # "dumping" the data into the outfile, creating a pickle file
+        # pickle.dump(self, output)
+        
+    # def load(self, FFT_library):
+
+        #pickle things
+
+        # self = new_dict
