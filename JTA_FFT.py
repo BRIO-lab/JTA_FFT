@@ -2,6 +2,7 @@
 # Copyright (c) Scott Banks banks@ufl.edu
 
 # Imports
+from typing import OrderedDict
 from numpy.fft.helper import fftshift
 from numpy.lib.nanfunctions import _nansum_dispatcher
 from torch._C import unify_type_list
@@ -15,10 +16,13 @@ from scipy.interpolate import splprep, splev
 import matplotlib.pyplot as plt
 import pickle
 import os
+from skimage import io
 import torch
 from torch import nn as nn
 from torch import optim as optim
 from torchvision import datasets, transforms, models
+from pose_hrnet_modded_in_notebook import PoseHighResolutionNet
+from collections import OrderedDict
 
 
 class JTA_FFT():
@@ -76,33 +80,37 @@ class JTA_FFT():
                        'xo': self.xo,
                        'yo': self.yo}
     
-    def Segment(self, Model, image, cpu):
+    def Segment(self, Model, Image):
         # Takes in a NN Model and unprocessed image, and segments the image. 
         # This allows it to be compared to the shape library that is created further on.
 
-        # Load the model, and put it into evaluation mode (this is done in CPU mode)
-        if cpu:
-            device = torch.device('cpu')
-            model = torch.load(Model, device)
-        else:
-            model = torch.load(Model)
-            device = torch.device("cuda")
-            model.load_state_dict(torch.load(Model)) 
-            model.to(device)
-        # transforming the image to the correct sizing
-        loader = transforms.Compose([transforms.Scale(self.imsize), transforms.ToTensor()])
+        # Load the model
+        model = PoseHighResolutionNet(num_key_points=1,num_image_channels=1)
+        cpu_model_state_dict = OrderedDict()
 
-        # Converting the image into a tensor
-        output = Image.open(image)
-        output = loader(output).float()
-        output = output.unsqueeze(0)
-        if not cpu:
-            output = output.cuda()
+        for old_name, w in torch.load(Model, map_location='cpu')['model_state_dict'].items():
+            if old_name[:6] == "module":
+                name = old_name[7:] # remove "module
+                cpu_model_state_dict[name] = w
+            else:
+                name = old_name
+                cpu_model_state_dict[name] = w
 
-        # Passing the image Tensor through the NN Model and returning the segmented image
-        model(output)
-        
-        return val
+        # set the model mode
+        model.load_state_dict(cpu_model_state_dict)
+        model.eval()
+
+        # load the image that needs to be segmented
+        image = io.imread(Image, as_gray = True)
+        image = torch.FloatTensor(image[None, :, :])
+
+        # pass the loaded image through the model
+        self.outputImg = model(image)
+
+        # set the output as numpy array (not sure if this actually needs to be done)
+        self.outputImg = self.outputImg.detach().numpy()
+
+        return self.outputImg
 
     def Make_Contour_Lib(self,CalFile,STLFile,dir):
 
@@ -469,7 +477,7 @@ class JTA_FFT():
                 u_new = np.linspace(u.min(), u.max(), self.nsamp)
                 #u_new = np.linspace(u.min(), u.max(), 64)
                 # https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.interpolate.splev.html
-                x_new, y_new = splev(u_new, tck, der=0)
+                self.x_new, self.y_new = splev(u_new, tck, der=0)
                 # Convert it back to numpy format for opencv to be able to display it
                 # plt.plot(x_new,self.imsize-y_new)
                 # plt.show()
@@ -478,7 +486,7 @@ class JTA_FFT():
             if done:
                 break
 
-        return x_new, y_new
+        return self.x_new, self.y_new
 
     def get_NFD(self,x,y):
 
@@ -672,7 +680,7 @@ class JTA_FFT():
                 "Angle Library, Mag Library, NFD Library, Rotation Indices, and Centroid Library!\n",
                 "Deleting the created file, as it has not had any data written to it...")
             output.close()
-            os.remove(filename)
+            # os.remove(filename)
 
     # "dumping" the data into the outfile, creating a pickle file
         # pickle.dump(self, output)

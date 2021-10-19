@@ -13,8 +13,9 @@ FFT = JTA_FFT("lima_files/calibration.txt")
      check that that function works as well.
 """
 
-FFT.Segment("ALBUMENTATIONS_HPG_210826_fem_allData_2.pth", "HL-T4-0218.tif", True)
-# FFT.create_contour()
+FFT.Segment("ALBUMENTATIONS_HPG_210826_fem_allData_2.pth", "HL-T4-0218.tif")
+FFT.create_contour(FFT.outputImg)
+FFT.get_NFD(FFT.x_new, FFT.y_new)
 
 FFT.save("output_data.fft")
 # print(FFT.angle_library)
