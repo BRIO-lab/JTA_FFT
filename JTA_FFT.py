@@ -4,15 +4,21 @@
 # Imports
 from numpy.fft.helper import fftshift
 from numpy.lib.nanfunctions import _nansum_dispatcher
+from torch._C import unify_type_list
+from PIL import Image
 import vtk
 import numpy as np
 import math
-import os
 from vtk.util import numpy_support
 import cv2
 from scipy.interpolate import splprep, splev
 import matplotlib.pyplot as plt
 import pickle
+import os
+import torch
+from torch import nn as nn
+from torch import optim as optim
+from torchvision import datasets, transforms, models
 
 
 class JTA_FFT():
@@ -70,6 +76,34 @@ class JTA_FFT():
                        'xo': self.xo,
                        'yo': self.yo}
     
+    def Segment(self, Model, image, cpu):
+        # Takes in a NN Model and unprocessed image, and segments the image. 
+        # This allows it to be compared to the shape library that is created further on.
+
+        # Load the model, and put it into evaluation mode (this is done in CPU mode)
+        if cpu:
+            device = torch.device('cpu')
+            model = torch.load(Model, device)
+        else:
+            model = torch.load(Model)
+            device = torch.device("cuda")
+            model.load_state_dict(torch.load(Model)) 
+            model.to(device)
+        # transforming the image to the correct sizing
+        loader = transforms.Compose([transforms.Scale(self.imsize), transforms.ToTensor()])
+
+        # Converting the image into a tensor
+        output = Image.open(image)
+        output = loader(output).float()
+        output = output.unsqueeze(0)
+        if not cpu:
+            output = output.cuda()
+
+        # Passing the image Tensor through the NN Model and returning the segmented image
+        model(output)
+        
+        return val
+
     def Make_Contour_Lib(self,CalFile,STLFile,dir):
 
         # TODO: add function description 
