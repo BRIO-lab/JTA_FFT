@@ -102,7 +102,9 @@ class JTA_FFT():
 
         # load the image that needs to be segmented
         image = io.imread(Image, as_gray = True)
-        image = torch.FloatTensor(image[None, :, :])
+        image = torch.FloatTensor(image[None, None, :, :])
+
+        print(image)
 
         # pass the loaded image through the model
         self.outputImg = model(image)

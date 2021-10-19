@@ -23,5 +23,3 @@ FFT.save("output_data.fft")
 # FFT.NFD_library
 
 # new_FFT = JTA_FFT.load("path/to/fftdoc")
-
-
