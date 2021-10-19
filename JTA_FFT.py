@@ -7,6 +7,7 @@ from numpy.lib.nanfunctions import _nansum_dispatcher
 import vtk
 import numpy as np
 import math
+import os
 from vtk.util import numpy_support
 import cv2
 from scipy.interpolate import splprep, splev
@@ -631,12 +632,13 @@ class JTA_FFT():
             pickle.dump(self.NFD_library, output)
             pickle.dump(self.rot_indices, output)
             pickle.dump(self.params, output)
+            output.close()
         except AttributeError as error:
             print("Error!", error, "\n You must instantiate all library objects before saving! \n",
-                "Angle Library, Mag Library, NFD Library, Rotation Indices, and Centroid Library!")
-        output.close() 
-
-        if self.angle_library
+                "Angle Library, Mag Library, NFD Library, Rotation Indices, and Centroid Library!\n",
+                "Deleting the created file, as it has not had any data written to it...")
+            output.close()
+            os.remove(filename)
 
     # "dumping" the data into the outfile, creating a pickle file
         # pickle.dump(self, output)
