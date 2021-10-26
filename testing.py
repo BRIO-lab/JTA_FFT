@@ -17,8 +17,12 @@ FFT.Segment("ALBUMENTATIONS_HPG_210826_fem_allData_2.pth", "HL-T4-0218.tif")
 FFT.create_contour(FFT.outputImg)
 FFT.get_NFD(FFT.x_new, FFT.y_new)
 
+FFT.testing_load("lima_files/dc_fem.npy", "lima_files/dc_tib.npy")
+
 FFT.save("Output/output_data.fft")
-# print(FFT.angle_library)
+
+FFT.load_pickle("Output/output_data.fft")
+# print(FFT.dc_tib)
 # print(FFT.params['pd'])
 # FFT.NFD_library
 

@@ -5,7 +5,7 @@
 from typing import OrderedDict
 from numpy.fft.helper import fftshift
 from numpy.lib.nanfunctions import _nansum_dispatcher
-from torch._C import unify_type_list
+# from torch._C import float32, uint8, unify_type_list
 from PIL import Image
 import vtk
 import numpy as np
@@ -23,6 +23,7 @@ from torch import optim as optim
 from torchvision import datasets, transforms, models
 from pose_hrnet_modded_in_notebook import PoseHighResolutionNet
 from collections import OrderedDict
+from JTA_FFT_dataset import *
 
 
 class JTA_FFT():
@@ -92,29 +93,31 @@ class JTA_FFT():
             if old_name[:6] == "module":
                 name = old_name[7:] # remove "module
                 cpu_model_state_dict[name] = w
-                print(name)
+                
             else:
                 name = old_name
                 cpu_model_state_dict[name] = w
-                print(name)
+            
 
         # set the model mode
         model.load_state_dict(cpu_model_state_dict)
         model.eval()
 
         # load the image that needs to be segmented
-        image = io.imread(Image, as_gray = True)
-        image = torch.FloatTensor(image[None, None, :, :])
+        imgset = FFTDataset(Image, transform = None)
+        imgloader = torch.utils.data.DataLoader(imgset, batch_size = 1, shuffle = False)
 
-        print(image)
+        for batch in imgloader:
+            batchx = batch["image"]
+            self.outputImg = model(batchx)
 
         # pass the loaded image through the model
-        self.outputImg = model(image)
-
-        print(self.outputImg)
-
-        # set the output as numpy array (not sure if this actually needs to be done)
-        self.outputImg = self.outputImg.detach().numpy()
+        
+        L = (self.outputImg > 0).type(torch.float32)
+        L = L[0,0,:,:]
+        im = torchvision.transforms.ToPILImage()((255*L).type(torch.uint8))
+        im.save("test_image_output.png") 
+        self.outputImg = np.array(im)
 
         return self.outputImg
 
@@ -659,6 +662,14 @@ class JTA_FFT():
 
         return x_est[0], y_est[0], z_est_corr[0], -1*z_rot_est[0], x_rot_corr[0], y_rot_corr[0]
 
+    def testing_load(self, path1, path2):
+        self.dc_fem = np.load(path1)
+
+    def load_pickle(self, pickle_path):
+        FFTFile = open(pickle_path, 'rb')
+        FFTPickle = pickle.load(FFTFile)
+        FFTFile.close()
+
     def save (self, filename):
 
         """ 
@@ -679,6 +690,7 @@ class JTA_FFT():
             pickle.dump(self.mag_library, output)
             pickle.dump(self.NFD_library, output)
             pickle.dump(self.rot_indices, output)
+            pickle.dump(self.dc_fem, output)
             pickle.dump(self.params, output)
             output.close()
         except AttributeError as error:
@@ -686,13 +698,4 @@ class JTA_FFT():
                 "Angle Library, Mag Library, NFD Library, Rotation Indices, and Centroid Library!\n",
                 "Deleting the created file, as it has not had any data written to it...")
             output.close()
-            # os.remove(filename)
-
-    # "dumping" the data into the outfile, creating a pickle file
-        # pickle.dump(self, output)
-        
-    # def load(self, FFT_library):
-
-        #pickle things
-
-        # self = new_dict
+            os.remove(filename)
