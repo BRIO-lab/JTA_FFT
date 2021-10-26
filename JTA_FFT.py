@@ -92,9 +92,11 @@ class JTA_FFT():
             if old_name[:6] == "module":
                 name = old_name[7:] # remove "module
                 cpu_model_state_dict[name] = w
+                print(name)
             else:
                 name = old_name
                 cpu_model_state_dict[name] = w
+                print(name)
 
         # set the model mode
         model.load_state_dict(cpu_model_state_dict)
@@ -108,6 +110,8 @@ class JTA_FFT():
 
         # pass the loaded image through the model
         self.outputImg = model(image)
+
+        print(self.outputImg)
 
         # set the output as numpy array (not sure if this actually needs to be done)
         self.outputImg = self.outputImg.detach().numpy()
@@ -452,7 +456,7 @@ class JTA_FFT():
 
     # Apply the same dilation and erosion to smooth image
         kernel = np.ones([3,3], np.uint8)
-        binary = cv2.dilate(image,kernel, iterations = 1)
+        binary = cv2.dilate(image, kernel, iterations = 1)
         binary = cv2.erode(binary, kernel, iterations = 1)
 
     # Find the contours of the provided image
