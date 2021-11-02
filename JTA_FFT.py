@@ -15,7 +15,6 @@ import cv2
 from scipy.interpolate import splprep, splev
 import matplotlib.pyplot as plt
 import pickle
-import os
 from skimage import io
 import torch
 from torch import nn as nn
@@ -311,7 +310,7 @@ class JTA_FFT():
 
         # Save the rotation indices in the working directory
         np.save(dir + "/rot_indices.npy", rot_indices)
-
+        self.rot_indices = rot_indices
         return self.xout, self.yout
 
 
@@ -645,8 +644,7 @@ class JTA_FFT():
 
         x_est, y_est = t_est_len
 
-
-       # x_est = x_inst - (math.cos(z_rot_rad)*x_lib - math.sin(z_rot_rad)*y_lib)
+    # x_est = x_inst - (math.cos(z_rot_rad)*x_lib - math.sin(z_rot_rad)*y_lib)
     #y_est = y_inst - (math.sin(z_rot_rad)*x_lib + math.cos(z_rot_rad)*y_lib)
 
     # Fix the units based on the location of the focal angle. Move z_est based on camera
@@ -659,43 +657,39 @@ class JTA_FFT():
         x_rot_corr = x_rot_est + np.cos(z_rot_rad)*phi_x - np.sin(z_rot_rad)*phi_y
         y_rot_corr = y_rot_est - np.sin(z_rot_rad)*phi_x - np.cos(z_rot_rad)*phi_y
 
-
         return x_est[0], y_est[0], z_est_corr[0], -1*z_rot_est[0], x_rot_corr[0], y_rot_corr[0]
 
-    def testing_load(self, path1, path2):
-        self.dc_fem = np.load(path1)
-
     def load_pickle(self, pickle_path):
-        FFTFile = open(pickle_path, 'rb')
-        FFTPickle = pickle.load(FFTFile)
-        FFTFile.close()
+        """
+            Loads a pickle from a passed-in file path.
+            Once the pickle is loaded, saves its params to self variables in order to allow easier access of needed data.
+        """
+        try:
+            FFTFile = open(pickle_path, 'rb')
+            self.FFTPickle = pickle.load(FFTFile)
+            self.NFD_library = self.FFTPickle['NFD_library']
+            self.angle_library = self.FFTPickle['angle_library']
+            self.mag_library = self.FFTPickle['mag_library']
+            self.centroid_library = self.FFTPickle['centroid_library']
+            self.rot_indices = self.FFTPickle['rot_indices']
+            FFTFile.close()
+
+        except FileNotFoundError:
+            print("Error! The file you are trying to load either does not exist, or does not exist at this location: ", pickle_path)
 
     def save (self, filename):
-
         """ 
-            save: saves the entire self to an object with filename defined by the user
-
-            checks: check to make sure that centroid, mag, angle, NFD. etc exist before saving
-                This will make sure that the b=library has been created before trying to save anything
-
-
-        """
-
-    # save the data from self into a pickle
-
+            Saves the necessary library variables into a dict for easier access after unpickling.
+            If any data does not exist, pickling and saving is skipped, and the user is informed.
+            Otherwise, the data is saved to a file 'filename'.nfd
+        """  
         try:
+            self.nfd_dict = {"NFD_library":self.NFD_library, "angle_library": self.angle_library,
+                "mag_library": self.mag_library, "centroid_library": self.centroid_library,
+                "rot_indices": self.rot_indices}
             output = open(filename, 'wb')
-            pickle.dump(self.angle_library, output)
-            pickle.dump(self.centroid_library, output)
-            pickle.dump(self.mag_library, output)
-            pickle.dump(self.NFD_library, output)
-            pickle.dump(self.rot_indices, output)
-            pickle.dump(self.dc_fem, output)
+            pickle.dump(self.nfd_dict, output)
             pickle.dump(self.params, output)
             output.close()
         except AttributeError as error:
-            print("Error!", error, "\n You must instantiate all library objects before saving! \n",
-                "Angle Library, Mag Library, NFD Library, Rotation Indices, and Centroid Library!\n",
-                "Deleting the created file, as it has not had any data written to it...")
-            output.close()
-            os.remove(filename)
+            print("Error!", error, "\nAll library objects must be instantiated before trying to save!")

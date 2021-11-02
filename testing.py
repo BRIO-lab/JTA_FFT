@@ -3,27 +3,31 @@ import os
 import glob
 from JTA_FFT import JTA_FFT
 import cv2
+"""
+    11/2 Added functions for Segmentation, saving data into a pickle, and loading from that pickle.
 
+    To use, create an instance of JTA_FFT and pass in the file path with the desired calibration file.
+    i.e. FFT = JTA_FFT("$filepath_here")
+    From there, you can access any of the functions in JTA_FFT:
+        Segment
+        Make_Contour_Lib
+        Create_NFD_Library
+        create_contour
+        get_NFD
+        estimate_pose
+        load_pickle
+        save
+"""
 FFT = JTA_FFT("lima_files/calibration.txt")
-
-"""
-    Testing right now: passing in a NN Model with an unprocessed image, 
-     passing it through the NN Model, then running create contour, get_NFD, 
-     and estimate_pose. Once this works, we can save it to a file to double 
-     check that that function works as well.
-"""
 
 FFT.Segment("ALBUMENTATIONS_HPG_210826_fem_allData_2.pth", "HL-T4-0218.tif")
 FFT.create_contour(FFT.outputImg)
 FFT.get_NFD(FFT.x_new, FFT.y_new)
+FFT.save("Output/output_data.nfd")
 
-FFT.testing_load("lima_files/dc_fem.npy", "lima_files/dc_tib.npy")
+# Create a new object to check if the created pickle from the previous FFT object can be loaded in and its values stored in the new object.
 
-FFT.save("Output/output_data.fft")
+blank_NFD = JTA_FFT("lima_files/calibration.txt")
+blank_NFD.load_pickle("Output/output_data.nfd")
 
-FFT.load_pickle("Output/output_data.fft")
-# print(FFT.dc_tib)
-# print(FFT.params['pd'])
-# FFT.NFD_library
-
-# new_FFT = JTA_FFT.load("path/to/fftdoc")
+print(blank_NFD.NFD_library)
