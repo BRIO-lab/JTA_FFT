@@ -2,7 +2,7 @@
 # Copyright (c) Scott Banks banks@ufl.edu
 
 # Imports
-from typing import OrderedDict
+# from typing import OrderedDict
 from numpy.fft.helper import fftshift
 from numpy.lib.nanfunctions import _nansum_dispatcher
 # from torch._C import float32, uint8, unify_type_list
@@ -151,14 +151,14 @@ class JTA_FFT():
     
     # Position is at origin, looking in -z direction, y is up
         cam.SetPosition(0, 0, 0)
-        cam.setFocalPoint(0, 0, -1)
-        cam.setViewUp(0, 1, 0)
-        cam.setWindowCenter(0, 0)
+        cam.SetFocalPoint(0, 0, -1)
+        cam.SetViewUp(0, 1, 0)
+        cam.SetWindowCenter(0, 0)
     
     # Set vertical view angle as an indirect way of 
     # setting the y focal distance
         angle = (180 / np.pi) * 2.0 * np.arctan2(self.imsize/2, fy)
-        cam.setViewAngle(angle)
+        cam.SetViewAngle(angle)
 
     # Set vertical view angle as an indirect way of
     # setting the x focal distance
@@ -167,7 +167,7 @@ class JTA_FFT():
         aspect = fy/fx
         m[0,0] = 1.0/aspect
         t = vtk.vtkTransform()
-        t.setMatrix(m.flatten())
+        t.SetMatrix(m.flatten())
         cam.SetUserTransform(t)
 
     # Set up vtk rendering again to make it stick
@@ -245,7 +245,7 @@ class JTA_FFT():
 
             # STL Render
 
-                renderer.addActor(stl_actor)
+                renderer.AddActor(stl_actor)
                 renderer.SetBackground(0.0, 0.0, 0.0)
                 renWin.AddRenderer(renderer)
                 renWin.SetSize(w,h)
@@ -256,7 +256,7 @@ class JTA_FFT():
                 winToIm.SetInput(renWin)
                 winToIm.Update()
                 vtk_image = winToIm.GetOutput()
-                width, height = vtk_image.GetDimensions()
+                width, height, channels = vtk_image.GetDimensions()
                 vtk_array = vtk_image.GetPointData().GetScalars()
                 components = vtk_array.GetNumberOfComponents()
                 arr = cv2.flip(numpy_support.vtk_to_numpy(vtk_array).reshape(height,width,components),0)
@@ -289,7 +289,7 @@ class JTA_FFT():
                         tck, u = splprep([x,y], u=None, s=1.0, per=1)
                     
                     # https://docs.scipy.org/doc/numpy-1.10.1/reference/generated/numpy.linspace.html
-                        u_new = np.linspace(u.min(), u.max(), nsamp)
+                        u_new = np.linspace(u.min(), u.max(), self.nsamp)
                     
                     # https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.interpolate.splev.html
                         x_new, y_new = splev(u_new, tck, der=0)
@@ -309,7 +309,7 @@ class JTA_FFT():
         
 
         # Save the rotation indices in the working directory
-        np.save(dir + "/rot_indices.npy", rot_indices)
+        # np.save(dir + "/rot_indices.npy", rot_indices)
         self.rot_indices = rot_indices
         return self.xout, self.yout
 
@@ -369,7 +369,7 @@ class JTA_FFT():
                 # FIXME: Need to fix the way that the FFT works, change norm
                 # norm = "ortho" should do the trick
                 fcoord = np.fft.fft((x_new + (self.imsize-y_new)*1j),nsamp)
-
+                print(fcoord.imag)
             # Shift so that the centroid of the projection is in the center
                 # FIXME: Fix this to normalize properly
                 fcoord = np.fft.fftshift(fcoord)
@@ -409,7 +409,7 @@ class JTA_FFT():
 
                 # Compute the Phase Angles of A(1) and A(k)
                     u = np.arctan2(
-                        fcoord.imag[int(nsamp/2 + 1)].
+                        fcoord.imag[int(nsamp/2 + 1)],
                         fcoord.real[int(nsamp/2 + 1)]
                     )
 
@@ -441,16 +441,16 @@ class JTA_FFT():
     # Storing as pickle would allow them to be stored in a separate class and load properly
     # For now, saving as .npy files works
 
-        np.save(dir + "/NFD-lib_" + model_type + ".npy", NFD_library)
-        np.save(dir + "/MAG-lib_" + model_type + ".npy", mag_library)
-        np.save(dir + "/ANGLE-lib_" + model_type + ".npy", angle_library)
-        np.save(dir + "/CENTROID-lib_" + model_type + ".npy", centroid_library)
+        #np.save(dir + "/NFD-lib_" + model_type + ".npy", NFD_library)
+        #np.save(dir + "/MAG-lib_" + model_type + ".npy", mag_library)
+        #np.save(dir + "/ANGLE-lib_" + model_type + ".npy", angle_library)
+        #np.save(dir + "/CENTROID-lib_" + model_type + ".npy", centroid_library)
 
         self.centroid_library = centroid_library
         self.mag_library = mag_library
         self.angle_library = angle_library
         self.NFD_library = NFD_library
-        self.rot_indices = rot_indices
+        #self.rot_indices = rot_indices
 
         return centroid_library, mag_library, angle_library, NFD_library
     
@@ -687,6 +687,7 @@ class JTA_FFT():
             self.nfd_dict = {"NFD_library":self.NFD_library, "angle_library": self.angle_library,
                 "mag_library": self.mag_library, "centroid_library": self.centroid_library,
                 "rot_indices": self.rot_indices}
+            filename = filename + '.nfd'
             output = open(filename, 'wb')
             pickle.dump(self.nfd_dict, output)
             pickle.dump(self.params, output)
