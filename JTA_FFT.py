@@ -31,8 +31,6 @@ class JTA_FFT():
     # TODO: determine the objects that we want this class to inherit 
     # I think that the best object to inherit would be the NFD library
     def __init__(self, CalFile):
-        # TODO: replace this with better initializations
-
         # Some of the coding variables
 
         # Number of Fourier Coefficients
@@ -47,13 +45,22 @@ class JTA_FFT():
         # Image Size
         self.imsize = 1024
 
-        # Load in calibration file
-        # TODO: perform a check to make sure that the 
-        #       calibration file is correctly formatted
+        # Load in calibration file and check for proper formatting
         cal_data = np.loadtxt(CalFile, skiprows=1)
         self.CalFile = CalFile
+        with open(CalFile, "r") as cal:
+            if (cal.readline().strip() != "JT_INTCALIB"):
+                raise Exception("Error! The provided calibration file has an incorrect header.")
+        
         # Extracting the four components from the calibration file
-
+        try:
+            for idx, val in enumerate(cal_data):
+                float(val)
+                if val <= 0 and idx != 1 and idx != 2:
+                    raise Exception("Error! Principal distance or scale is <= 0!")
+        except ValueError as error:
+            print("Error! ", error, " is not a float!")
+        
         # principal distance
         pd = cal_data[0]
         self.pd = pd
