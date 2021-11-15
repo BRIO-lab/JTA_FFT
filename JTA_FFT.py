@@ -2,8 +2,11 @@
 # Copyright (c) Scott Banks banks@ufl.edu
 
 # Imports
+# from typing import OrderedDict
 from numpy.fft.helper import fftshift
 from numpy.lib.nanfunctions import _nansum_dispatcher
+# from torch._C import float32, uint8, unify_type_list
+from PIL import Image
 import vtk
 import numpy as np
 import math
@@ -11,6 +14,15 @@ from vtk.util import numpy_support
 import cv2
 from scipy.interpolate import splprep, splev
 import matplotlib.pyplot as plt
+import pickle
+from skimage import io
+import torch
+from torch import nn as nn
+from torch import optim as optim
+from torchvision import datasets, transforms, models
+from pose_hrnet_modded_in_notebook import PoseHighResolutionNet
+from collections import OrderedDict
+from JTA_FFT_dataset import *
 
 
 class JTA_FFT():
@@ -19,30 +31,36 @@ class JTA_FFT():
     # TODO: determine the objects that we want this class to inherit 
     # I think that the best object to inherit would be the NFD library
     def __init__(self, CalFile):
-        # TODO: replace this with better initializations
-
         # Some of the coding variables
 
         # Number of Fourier Coefficients
-        nsamp = 128
-        self.nsamp = nsamp
+        self.nsamp = 128
 
         # Library Increment Parameters
-        self.xrotmax = 30
+        self.xrotmax = 45
         self.xrotinc = 3
-        self.yrotmax = 30
+        self.yrotmax = 45
         self.yrotinc = 3
 
         # Image Size
         self.imsize = 1024
 
-        # Load in calibration file
-        # TODO: perform a check to make sure that the 
-        #       calibration file is correctly formatted
+        # Load in calibration file and check for proper formatting
         cal_data = np.loadtxt(CalFile, skiprows=1)
-
+        self.CalFile = CalFile
+        with open(CalFile, "r") as cal:
+            if (cal.readline().strip() != "JT_INTCALIB"):
+                raise Exception("Error! The provided calibration file has an incorrect header.")
+        
         # Extracting the four components from the calibration file
-
+        try:
+            for idx, val in enumerate(cal_data):
+                float(val)
+                if val <= 0 and idx != 1 and idx != 2:
+                    raise Exception("Error! Principal distance or scale is <= 0!")
+        except ValueError as error:
+            print("Error! ", error, " is not a float!")
+        
         # principal distance
         pd = cal_data[0]
         self.pd = pd
@@ -56,14 +74,64 @@ class JTA_FFT():
         yo = cal_data[2]
         self.xo = xo
         self.yo = yo
+
+        self.params = {'nsamp':self.nsamp, 
+                       'xrotmax': self.xrotmax,
+                       'xrotinc': self.xrotinc,
+                       'yrotmax': self.yrotmax,
+                       'yrotinc': self.yrotinc,
+                       'imsize': self.imsize,
+                       'pd': self.pd,
+                       'sc': self.sc,
+                       'xo': self.xo,
+                       'yo': self.yo}
     
-    def Make_Contour_Lib(self,CalFile,STLFile,dir):
+    def Segment(self, Model, Image):
+        # Takes in a NN Model and unprocessed image, and segments the image. 
+        # This allows it to be compared to the shape library that is created further on.
+
+        # Load the model
+        model = PoseHighResolutionNet(num_key_points=1,num_image_channels=1)
+        cpu_model_state_dict = OrderedDict()
+
+        for old_name, w in torch.load(Model, map_location='cpu')['model_state_dict'].items():
+            if old_name[:6] == "module":
+                name = old_name[7:] # remove "module
+                cpu_model_state_dict[name] = w
+                
+            else:
+                name = old_name
+                cpu_model_state_dict[name] = w
+            
+
+        # set the model mode
+        model.load_state_dict(cpu_model_state_dict)
+        model.eval()
+
+        # load the image that needs to be segmented
+        imgset = FFTDataset(Image, transform = None)
+        imgloader = torch.utils.data.DataLoader(imgset, batch_size = 1, shuffle = False)
+
+        for batch in imgloader:
+            batchx = batch["image"]
+            self.outputImg = model(batchx)
+
+        # pass the loaded image through the model
+        
+        L = (self.outputImg > 0).type(torch.float32)
+        L = L[0,0,:,:]
+        im = torchvision.transforms.ToPILImage()((255*L).type(torch.uint8))
+        im.save("test_image_output.png") 
+        self.outputImg = np.array(im)
+
+        return self.outputImg
+
+    def Make_Contour_Lib(self,STLFile):
 
         # TODO: add function description 
 
         plt.clf()
 
-        self.CalFile = CalFile
         self.STLFile = STLFile
 
         isc = 1/self.sc      # inverse scale [px/mm]
@@ -88,14 +156,14 @@ class JTA_FFT():
     
     # Position is at origin, looking in -z direction, y is up
         cam.SetPosition(0, 0, 0)
-        cam.setFocalPoint(0, 0, -1)
-        cam.setViewUp(0, 1, 0)
-        cam.setWindowCenter(0, 0)
+        cam.SetFocalPoint(0, 0, -1)
+        cam.SetViewUp(0, 1, 0)
+        cam.SetWindowCenter(0, 0)
     
     # Set vertical view angle as an indirect way of 
     # setting the y focal distance
         angle = (180 / np.pi) * 2.0 * np.arctan2(self.imsize/2, fy)
-        cam.setViewAngle(angle)
+        cam.SetViewAngle(angle)
 
     # Set vertical view angle as an indirect way of
     # setting the x focal distance
@@ -104,7 +172,7 @@ class JTA_FFT():
         aspect = fy/fx
         m[0,0] = 1.0/aspect
         t = vtk.vtkTransform()
-        t.setMatrix(m.flatten())
+        t.SetMatrix(m.flatten())
         cam.SetUserTransform(t)
 
     # Set up vtk rendering again to make it stick
@@ -146,7 +214,6 @@ class JTA_FFT():
                            int((2*self.yrotmax/self.yrotinc))+1) 
 
     # Create output arrays for contours
-
         self.xout = np.zeros([int((2*self.xrotmax/self.xrotinc)+1),
                               int((2*self.yrotmax/self.yrotinc)+1),
                               self.nsamp])
@@ -159,7 +226,6 @@ class JTA_FFT():
         rot_indices = np.empty([xrot.size,yrot.size,2])
 
     # Create for-loop to run through each of the rotation combinations
-
         for j, xr in enumerate(xrot):
             for k, yr in enumerate(yrot):
             # Save the current rotation index
@@ -182,7 +248,7 @@ class JTA_FFT():
 
             # STL Render
 
-                renderer.addActor(stl_actor)
+                renderer.AddActor(stl_actor)
                 renderer.SetBackground(0.0, 0.0, 0.0)
                 renWin.AddRenderer(renderer)
                 renWin.SetSize(w,h)
@@ -193,7 +259,7 @@ class JTA_FFT():
                 winToIm.SetInput(renWin)
                 winToIm.Update()
                 vtk_image = winToIm.GetOutput()
-                width, height = vtk_image.GetDimensions()
+                width, height, channels = vtk_image.GetDimensions()
                 vtk_array = vtk_image.GetPointData().GetScalars()
                 components = vtk_array.GetNumberOfComponents()
                 arr = cv2.flip(numpy_support.vtk_to_numpy(vtk_array).reshape(height,width,components),0)
@@ -207,8 +273,6 @@ class JTA_FFT():
                 contours, hierarchy = cv2.findContours(binary,
                                                        cv2.RETR_EXTERNAL,
                                                        cv2.CHAIN_APPROX_NONE)
-                smoothened = []
-                done = 0
 
                 # Loop through the contours to only grab the largest
 
@@ -226,7 +290,7 @@ class JTA_FFT():
                         tck, u = splprep([x,y], u=None, s=1.0, per=1)
                     
                     # https://docs.scipy.org/doc/numpy-1.10.1/reference/generated/numpy.linspace.html
-                        u_new = np.linspace(u.min(), u.max(), nsamp)
+                        u_new = np.linspace(u.min(), u.max(), self.nsamp)
                     
                     # https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.interpolate.splev.html
                         x_new, y_new = splev(u_new, tck, der=0)
@@ -235,10 +299,6 @@ class JTA_FFT():
                         plt.plot(x_new,self.imsize-y_new)
 
                     # break code if you are done
-
-                        done = 1
-
-                    if done:
                         break
 
                 self.xout[j,k,:] = x_new
@@ -246,15 +306,15 @@ class JTA_FFT():
         
 
         # Save the rotation indices in the working directory
-        np.save(dir + "/rot_indices.npy", rot_indices)
-
+        # np.save(dir + "/rot_indices.npy", rot_indices)
+        self.rot_indices = rot_indices
         return self.xout, self.yout
 
 
 # Now we want to write a function that will create the 
 # Normalized Fourier Descriptor Library
 
-    def Create_NFD_Library(self, dir, model_type):
+    def Create_NFD_Library(self):
         # TODO: fix the loading of different types for each of the sub-functions
 
         x = self.xout
@@ -306,7 +366,7 @@ class JTA_FFT():
                 # FIXME: Need to fix the way that the FFT works, change norm
                 # norm = "ortho" should do the trick
                 fcoord = np.fft.fft((x_new + (self.imsize-y_new)*1j),nsamp)
-
+                print(fcoord.imag)
             # Shift so that the centroid of the projection is in the center
                 # FIXME: Fix this to normalize properly
                 fcoord = np.fft.fftshift(fcoord)
@@ -346,7 +406,7 @@ class JTA_FFT():
 
                 # Compute the Phase Angles of A(1) and A(k)
                     u = np.arctan2(
-                        fcoord.imag[int(nsamp/2 + 1)].
+                        fcoord.imag[int(nsamp/2 + 1)],
                         fcoord.real[int(nsamp/2 + 1)]
                     )
 
@@ -378,18 +438,23 @@ class JTA_FFT():
     # Storing as pickle would allow them to be stored in a separate class and load properly
     # For now, saving as .npy files works
 
-        np.save(dir + "/NFD-lib_" + model_type + ".npy", NFD_library)
-        np.save(dir + "/MAG-lib_" + model_type + ".npy", mag_library)
-        np.save(dir + "/ANGLE-lib_" + model_type + ".npy", angle_library)
-        np.save(dir + "/CENTROID-lib_" + model_type + ".npy", centroid_library)
+        #np.save(dir + "/NFD-lib_" + model_type + ".npy", NFD_library)
+        #np.save(dir + "/MAG-lib_" + model_type + ".npy", mag_library)
+        #np.save(dir + "/ANGLE-lib_" + model_type + ".npy", angle_library)
+        #np.save(dir + "/CENTROID-lib_" + model_type + ".npy", centroid_library)
+
+        self.centroid_library = centroid_library
+        self.mag_library = mag_library
+        self.angle_library = angle_library
+        self.NFD_library = NFD_library
 
         return centroid_library, mag_library, angle_library, NFD_library
     
-    def create_contour(self,image):
+    def Create_Contour(self,image):
 
     # Apply the same dilation and erosion to smooth image
         kernel = np.ones([3,3], np.uint8)
-        binary = cv2.dilate(image,kernel, iterations = 1)
+        binary = cv2.dilate(image, kernel, iterations = 1)
         binary = cv2.erode(binary, kernel, iterations = 1)
 
     # Find the contours of the provided image
@@ -416,7 +481,7 @@ class JTA_FFT():
                 u_new = np.linspace(u.min(), u.max(), self.nsamp)
                 #u_new = np.linspace(u.min(), u.max(), 64)
                 # https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.interpolate.splev.html
-                x_new, y_new = splev(u_new, tck, der=0)
+                self.x_new, self.y_new = splev(u_new, tck, der=0)
                 # Convert it back to numpy format for opencv to be able to display it
                 # plt.plot(x_new,self.imsize-y_new)
                 # plt.show()
@@ -425,7 +490,7 @@ class JTA_FFT():
             if done:
                 break
 
-        return x_new, y_new
+        return self.x_new, self.y_new
 
     def get_NFD(self,x,y):
 
@@ -435,11 +500,11 @@ class JTA_FFT():
         kmax = 5
         k_norm = np.array([2, -1, -2, -3, -4])
 
-    # Create an NFD instance for this variable
-    # Dims: [norms, num-samp]
+        # Create an NFD instance for this variable
+        # Dims: [norms, num-samp]
         NFD_instance = np.zeros([kmax,nsamp], dtype='c16')
 
-    # Create an angle instance
+        # Create an angle instance
         angle_instance = np.zeros([kmax])
 
         index_vect = np.linspace(1,nsamp,nsamp) - nsamp/2
@@ -489,19 +554,17 @@ class JTA_FFT():
         NFD_instance = NFD_instance[0:max_norms,:] 
         angle_instance = angle_instance[0:max_norms]
 
-        return centroid_instance, mag_instance, angle_instance, NFD_instance
-    # TODO: fix the estimate pose to just take in the value of self so that
-    # so many arguements do not need to be passed into the function
-    # make it easier for people to call the function and get the values that they want out 
-    # of it
-    def estimate_pose(
-            self,
-            rot_indices, 
-            centroid_library,  mag_library,  angle_library,  NFD_library,
-            centroid_instance, mag_instance, angle_instance, NFD_instance):
+        instance = {"centroid":centroid_instance, 
+                    "mag":mag_instance, 
+                    "angle":angle_instance,
+                    "NFD":NFD_instance}
 
-        xspan = NFD_library.shape[0]
-        yspan = NFD_library.shape[1]
+        return instance
+    
+    def estimate_pose(self, instance):
+        
+        xspan = self.NFD_library.shape[0]
+        yspan = self.NFD_library.shape[1]
         
     # Create an empty variable to fill up the distance 
     # from the instance to each of the library variables
@@ -512,19 +575,19 @@ class JTA_FFT():
     # TODO: the following code adjusts for the incorrect normalization when creating the libs
     # TODO: this is only a placeholder
 
-        centroid_library = centroid_library / self.nsamp
-        centroid_instance = centroid_instance / self.nsamp
+        centroid_library = self.centroid_library / self.nsamp
+        centroid_instance = instance["centroid"] / self.nsamp
 
 
-        mag_library = mag_library / self.nsamp
-        mag_instance = mag_instance / self.nsamp
+        mag_library = self.mag_library / self.nsamp
+        mag_instance = instance["mag"] / self.nsamp
 
     # Loop through all the indices in the library and check the distance w instance
         for i in range(0,xspan):
             for j in range(0,yspan):
 
             # Compute the difference between the instance and the library
-                diff = NFD_instance[0,:] - NFD_library[i,j,0,:]
+                diff = instance["NFD"][0,:] - self.NFD_library[i,j,0,:]
 
             # Take the L2 norm to get the distance
                 dist[i,j] = np.linalg.norm(diff)
@@ -534,11 +597,11 @@ class JTA_FFT():
         idx,idy = np.where(dist == dist.min())
 
     # Find the x and y rotation estimates from the library indices
-        x_rot_est = rot_indices[idx,idy,0]
-        y_rot_est = rot_indices[idx,idy,1]
+        x_rot_est = self.rot_indices[idx,idy,0]
+        y_rot_est = self.rot_indices[idx,idy,1]
 
     # Now, find the z-rotation based on the library angle normalizations
-        z_rot_est = angle_instance[0] - angle_library[idx,idy,0]
+        z_rot_est = instance["angle_instance"][0] - self.angle_library[idx,idy,0]
         z_rot_rad = z_rot_est * np.pi / 180
         z_rot_rad = -1*z_rot_rad
 
@@ -575,8 +638,7 @@ class JTA_FFT():
 
         x_est, y_est = t_est_len
 
-
-       # x_est = x_inst - (math.cos(z_rot_rad)*x_lib - math.sin(z_rot_rad)*y_lib)
+    # x_est = x_inst - (math.cos(z_rot_rad)*x_lib - math.sin(z_rot_rad)*y_lib)
     #y_est = y_inst - (math.sin(z_rot_rad)*x_lib + math.cos(z_rot_rad)*y_lib)
 
     # Fix the units based on the location of the focal angle. Move z_est based on camera
@@ -589,5 +651,40 @@ class JTA_FFT():
         x_rot_corr = x_rot_est + np.cos(z_rot_rad)*phi_x - np.sin(z_rot_rad)*phi_y
         y_rot_corr = y_rot_est - np.sin(z_rot_rad)*phi_x - np.cos(z_rot_rad)*phi_y
 
-
         return x_est[0], y_est[0], z_est_corr[0], -1*z_rot_est[0], x_rot_corr[0], y_rot_corr[0]
+
+    def load_pickle(self, pickle_path):
+        """
+            Loads a pickle from a passed-in file path.
+            Once the pickle is loaded, saves its params to self variables in order to allow easier access of needed data.
+        """
+        try:
+            FFTFile = open(pickle_path, 'rb')
+            self.FFTPickle = pickle.load(FFTFile)
+            self.NFD_library = self.FFTPickle['NFD_library']
+            self.angle_library = self.FFTPickle['angle_library']
+            self.mag_library = self.FFTPickle['mag_library']
+            self.centroid_library = self.FFTPickle['centroid_library']
+            self.rot_indices = self.FFTPickle['rot_indices']
+            FFTFile.close()
+
+        except FileNotFoundError:
+            print("Error! The file you are trying to load either does not exist, or does not exist at this location: ", pickle_path)
+
+    def save (self, filename):
+        """ 
+            Saves the necessary library variables into a dict for easier access after unpickling.
+            If any data does not exist, pickling and saving is skipped, and the user is informed.
+            Otherwise, the data is saved to a file 'filename'.nfd
+        """  
+        try:
+            self.nfd_dict = {"NFD_library":self.NFD_library, "angle_library": self.angle_library,
+                "mag_library": self.mag_library, "centroid_library": self.centroid_library,
+                "rot_indices": self.rot_indices}
+            filename = filename + '.nfd'
+            output = open(filename, 'wb')
+            pickle.dump(self.nfd_dict, output)
+            pickle.dump(self.params, output)
+            output.close()
+        except AttributeError as error:
+            print("Error!", error, "\nAll library objects must be instantiated before trying to save!")

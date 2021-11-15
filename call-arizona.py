@@ -1,7 +1,7 @@
 import numpy as np
 import os
 import glob
-from MakeLib import JTA_FFT
+from JTA_FFT import *
 
 
 HOME_DIR = "C:/Datasets_FemCleaned/Arizona/Arizona_Organized"
@@ -20,14 +20,18 @@ for patient_id in os.listdir(HOME_DIR):
             tib_model = glob.glob1(movement_dir, "*tib*.stl")
             fem_model_path = movement_dir + "/" + fem_model[0]
             tib_model_path = movement_dir + "/" + tib_model[0]
+            fem_lib_name = os.path.splitext(fem_model_path)[0] 
+            tib_lib_name = os.path.splitext(tib_model_path)[0] 
             print(movement_dir)
 
 
 
-            FFT_fem = JTA_FFT()
-            FFT_fem.MakeLib(cal_data,fem_model_path,movement_dir)
-            FFT_fem.NFD_Lib(movement_dir,"fem")
+            FFT_fem = JTA_FFT(movement_dir + "/cal1024.txt")
+            FFT_fem.Make_Contour_Lib(cal_data,fem_model_path,movement_dir)
+            FFT_fem.Create_NFD_Library(movement_dir,"fem")
+            FFT_fem.save(fem_lib_name)
 
-            FFT_tib = JTA_FFT()
-            FFT_tib.MakeLib(cal_data,tib_model_path, movement_dir)
-            FFT_tib.NFD_Lib(movement_dir,"tib")
+            FFT_tib = JTA_FFT(movement_dir + "/cal1024.txt")
+            FFT_tib.Make_Contour_Lib(cal_data,tib_model_path, movement_dir)
+            FFT_tib.Create_NFD_Library(movement_dir,"tib")
+            FFT_tib.save(tib_lib_name)
