@@ -40,9 +40,9 @@ class JTA_FFT():
         self.nsamp = nsamp
 
         # Library Increment Parameters
-        self.xrotmax = 30
+        self.xrotmax = 45
         self.xrotinc = 3
-        self.yrotmax = 30
+        self.yrotmax = 45
         self.yrotinc = 3
 
         # Image Size
