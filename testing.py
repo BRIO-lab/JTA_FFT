@@ -18,16 +18,18 @@ import cv2
         load_pickle
         save
 """
-FFT = JTA_FFT("lima_files/calibration.txt")
+FFT = JTA_FFT("calibration.txt")
 
-FFT.Segment("ALBUMENTATIONS_HPG_210826_fem_allData_2.pth", "HL-T4-0218.tif")
-FFT.create_contour(FFT.outputImg)
-FFT.get_NFD(FFT.x_new, FFT.y_new)
-FFT.save("Output/output_data.nfd")
+# FFT = JTA_FFT("lima_files/calibration.txt")
 
-# Create a new object to check if the created pickle from the previous FFT object can be loaded in and its values stored in the new object.
+# FFT.Segment("ALBUMENTATIONS_HPG_210826_fem_allData_2.pth", "HL-T4-0218.tif")
+# FFT.create_contour(FFT.outputImg)
+# FFT.get_NFD(FFT.x_new, FFT.y_new)
+# FFT.save("Output/output_data.nfd")
 
-blank_NFD = JTA_FFT("lima_files/calibration.txt")
-blank_NFD.load_pickle("Output/output_data.nfd")
+# # Create a new object to check if the created pickle from the previous FFT object can be loaded in and its values stored in the new object.
 
-print(blank_NFD.NFD_library)
+# blank_NFD = JTA_FFT("lima_files/calibration.txt")
+# blank_NFD.load_pickle("Output/output_data.nfd")
+
+# print(blank_NFD.NFD_library)
