@@ -36,8 +36,7 @@ class JTA_FFT():
         # Some of the coding variables
 
         # Number of Fourier Coefficients
-        nsamp = 128
-        self.nsamp = nsamp
+        self.nsamp = 128
 
         # Library Increment Parameters
         self.xrotmax = 45
@@ -52,7 +51,7 @@ class JTA_FFT():
         # TODO: perform a check to make sure that the 
         #       calibration file is correctly formatted
         cal_data = np.loadtxt(CalFile, skiprows=1)
-
+        self.CalFile = CalFile
         # Extracting the four components from the calibration file
 
         # principal distance
@@ -120,13 +119,12 @@ class JTA_FFT():
 
         return self.outputImg
 
-    def Make_Contour_Lib(self,CalFile,STLFile,dir):
+    def Make_Contour_Lib(self,STLFile):
 
         # TODO: add function description 
 
         plt.clf()
 
-        self.CalFile = CalFile
         self.STLFile = STLFile
 
         isc = 1/self.sc      # inverse scale [px/mm]
@@ -209,7 +207,6 @@ class JTA_FFT():
                            int((2*self.yrotmax/self.yrotinc))+1) 
 
     # Create output arrays for contours
-
         self.xout = np.zeros([int((2*self.xrotmax/self.xrotinc)+1),
                               int((2*self.yrotmax/self.yrotinc)+1),
                               self.nsamp])
@@ -222,7 +219,6 @@ class JTA_FFT():
         rot_indices = np.empty([xrot.size,yrot.size,2])
 
     # Create for-loop to run through each of the rotation combinations
-
         for j, xr in enumerate(xrot):
             for k, yr in enumerate(yrot):
             # Save the current rotation index
@@ -270,8 +266,6 @@ class JTA_FFT():
                 contours, hierarchy = cv2.findContours(binary,
                                                        cv2.RETR_EXTERNAL,
                                                        cv2.CHAIN_APPROX_NONE)
-                smoothened = []
-                done = 0
 
                 # Loop through the contours to only grab the largest
 
@@ -298,10 +292,6 @@ class JTA_FFT():
                         plt.plot(x_new,self.imsize-y_new)
 
                     # break code if you are done
-
-                        done = 1
-
-                    if done:
                         break
 
                 self.xout[j,k,:] = x_new
@@ -317,7 +307,7 @@ class JTA_FFT():
 # Now we want to write a function that will create the 
 # Normalized Fourier Descriptor Library
 
-    def Create_NFD_Library(self, dir, model_type):
+    def Create_NFD_Library(self):
         # TODO: fix the loading of different types for each of the sub-functions
 
         x = self.xout
@@ -450,11 +440,10 @@ class JTA_FFT():
         self.mag_library = mag_library
         self.angle_library = angle_library
         self.NFD_library = NFD_library
-        #self.rot_indices = rot_indices
 
         return centroid_library, mag_library, angle_library, NFD_library
     
-    def create_contour(self,image):
+    def Create_Contour(self,image):
 
     # Apply the same dilation and erosion to smooth image
         kernel = np.ones([3,3], np.uint8)
@@ -504,11 +493,11 @@ class JTA_FFT():
         kmax = 5
         k_norm = np.array([2, -1, -2, -3, -4])
 
-    # Create an NFD instance for this variable
-    # Dims: [norms, num-samp]
+        # Create an NFD instance for this variable
+        # Dims: [norms, num-samp]
         NFD_instance = np.zeros([kmax,nsamp], dtype='c16')
 
-    # Create an angle instance
+        # Create an angle instance
         angle_instance = np.zeros([kmax])
 
         index_vect = np.linspace(1,nsamp,nsamp) - nsamp/2
@@ -558,19 +547,17 @@ class JTA_FFT():
         NFD_instance = NFD_instance[0:max_norms,:] 
         angle_instance = angle_instance[0:max_norms]
 
-        return centroid_instance, mag_instance, angle_instance, NFD_instance
-    # TODO: fix the estimate pose to just take in the value of self so that
-    # so many arguements do not need to be passed into the function
-    # make it easier for people to call the function and get the values that they want out 
-    # of it
-    def estimate_pose(
-            self,
-            rot_indices, 
-            centroid_library,  mag_library,  angle_library,  NFD_library,
-            centroid_instance, mag_instance, angle_instance, NFD_instance):
+        instance = {"centroid":centroid_instance, 
+                    "mag":mag_instance, 
+                    "angle":angle_instance,
+                    "NFD":NFD_instance}
 
-        xspan = NFD_library.shape[0]
-        yspan = NFD_library.shape[1]
+        return instance
+    
+    def estimate_pose(self, instance):
+        
+        xspan = self.NFD_library.shape[0]
+        yspan = self.NFD_library.shape[1]
         
     # Create an empty variable to fill up the distance 
     # from the instance to each of the library variables
@@ -581,19 +568,19 @@ class JTA_FFT():
     # TODO: the following code adjusts for the incorrect normalization when creating the libs
     # TODO: this is only a placeholder
 
-        centroid_library = centroid_library / self.nsamp
-        centroid_instance = centroid_instance / self.nsamp
+        centroid_library = self.centroid_library / self.nsamp
+        centroid_instance = instance["centroid"] / self.nsamp
 
 
-        mag_library = mag_library / self.nsamp
-        mag_instance = mag_instance / self.nsamp
+        mag_library = self.mag_library / self.nsamp
+        mag_instance = instance["mag"] / self.nsamp
 
     # Loop through all the indices in the library and check the distance w instance
         for i in range(0,xspan):
             for j in range(0,yspan):
 
             # Compute the difference between the instance and the library
-                diff = NFD_instance[0,:] - NFD_library[i,j,0,:]
+                diff = instance["NFD"][0,:] - self.NFD_library[i,j,0,:]
 
             # Take the L2 norm to get the distance
                 dist[i,j] = np.linalg.norm(diff)
@@ -603,11 +590,11 @@ class JTA_FFT():
         idx,idy = np.where(dist == dist.min())
 
     # Find the x and y rotation estimates from the library indices
-        x_rot_est = rot_indices[idx,idy,0]
-        y_rot_est = rot_indices[idx,idy,1]
+        x_rot_est = self.rot_indices[idx,idy,0]
+        y_rot_est = self.rot_indices[idx,idy,1]
 
     # Now, find the z-rotation based on the library angle normalizations
-        z_rot_est = angle_instance[0] - angle_library[idx,idy,0]
+        z_rot_est = instance["angle_instance"][0] - self.angle_library[idx,idy,0]
         z_rot_rad = z_rot_est * np.pi / 180
         z_rot_rad = -1*z_rot_rad
 
