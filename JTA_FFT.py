@@ -601,7 +601,7 @@ class JTA_FFT():
         y_rot_est = self.rot_indices[idx,idy,1]
 
     # Now, find the z-rotation based on the library angle normalizations
-        z_rot_est = instance["angle_instance"][0] - self.angle_library[idx,idy,0]
+        z_rot_est = instance["angle"][0] - self.angle_library[idx,idy,0]
         z_rot_rad = z_rot_est * np.pi / 180
         z_rot_rad = -1*z_rot_rad
 
