@@ -38,9 +38,9 @@ class JTA_FFT():
 
         # Library Increment Parameters
         self.xrotmax = 45
-        self.xrotinc = 3
+        self.xrotinc = 1
         self.yrotmax = 45
-        self.yrotinc = 3
+        self.yrotinc = 1
 
         # Image Size
         self.imsize = 1024
@@ -278,11 +278,11 @@ class JTA_FFT():
 
                 for contour in contours:
                     x,y = contour.T
-
+                    
                 # Convert from numpy arrays to normal arrays
                     x = x.tolist()[0]
                     y = y.tolist()[0]
-
+                    
                     if len(x) > 200:
 
                     # Resample contour in nsamp equispaced increments using spline interpolation
@@ -295,11 +295,16 @@ class JTA_FFT():
                     # https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.interpolate.splev.html
                         x_new, y_new = splev(u_new, tck, der=0)
                         
+                        
                     # Convert it back to numpy format for opencv to be able to display it
                         plt.plot(x_new,self.imsize-y_new)
 
                     # break code if you are done
                         break
+                        
+                    else:
+                        x_new = 0
+                        y_new = 0
 
                 self.xout[j,k,:] = x_new
                 self.yout[j,k,:] = y_new
@@ -643,6 +648,8 @@ class JTA_FFT():
 
     # Fix the units based on the location of the focal angle. Move z_est based on camera
         z_est_corr = z_est - self.pd
+        if abs(z_est_corr) > abs(self.pd):
+            z_est_corr = - self.pd
 
     # Fix the rotations based on the projective geometry
         phi_x = np.arctan2(y_est, (self.pd - z_est)) * np.pi/180

@@ -4,13 +4,14 @@ from JTA_FFT import *
 import cv2
 
 def main():
-    HOME_DIR = "C:/Datasets_FemCleaned/Lima/Lima Testing/Patient 77-17-MF"
+    HOME_DIR = "C:/Datasets_FemCleaned/Lima/Lima Testing/Patient 77-13-PF"
     cal = HOME_DIR + "/calibration.txt"
     FEM_NFD = JTA_FFT(cal)
     TIB_NFD = JTA_FFT(cal)
     FEM_NFD.load_pickle(HOME_DIR + "/KR_left_7_fem.nfd")
     TIB_NFD.load_pickle(HOME_DIR + "/KR_left_5_tib.nfd")
-    jts_header = "JT_EULER_312\n x_tran,\ty_tran,\tz_tran,\tz_rot,\tx_rot,\ty_rot"
+    jts_fmt = '%16.9s,%16.9s,%16.9s,\t\t   %16.9s,%16.9s,%16.9s'
+    jts_header = "JT_EULER_312\n          x_tran,          y_tran,          z_tran,                   z_rot,           x_rot,           y_rot"
 
     for session in ["Session_1", "Session_2", "Session_3"]:
         SESS_DIR = HOME_DIR + "/" + session
@@ -44,8 +45,8 @@ def main():
                 xt,yt,zt,zr,xr,yr = TIB_NFD.estimate_pose(fem_instance)
                 tib_jts_file[idx,:] = [xt,yt,zt,zr,xr,yr] 
 
-            np.savetxt(MVT_DIR + "/tib_fft.jts",tib_jts_file,delimiter=",", header=jts_header, fmt = "  %.2f")
-            np.savetxt(MVT_DIR + "/fem_fft.jts",fem_jts_file, delimiter = ",", header = jts_header, fmt = "     %.2f")
+            np.savetxt(MVT_DIR + "/tib_fft.jts",tib_jts_file,delimiter=",", header=jts_header, fmt = jts_fmt,comments = '')
+            np.savetxt(MVT_DIR + "/fem_fft.jts",fem_jts_file, delimiter = ",", header = jts_header, fmt = jts_fmt, comments = '')
             
 if __name__ == "__main__":
     main()

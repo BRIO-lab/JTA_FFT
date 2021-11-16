@@ -3,10 +3,10 @@ import os
 import numpy as np
 
 def main():
-    GMK_DIR = "C:/Datasets_FemCleaned/GMK/GMK_Organized/Patient_2/Session_1/PivotExt_1"
-    FEM_STL = GMK_DIR + "/GMK_Sphere_right_5_fem.stl"
+    GMK_DIR = "C:\Datasets_FemCleaned/Lima/Lima Testing/Patient 77-13-PF/Session_1/Kneel_1"
+    FEM_STL = GMK_DIR + "/KR_right_6_fem.stl"
     FEM_NAME = os.path.splitext(FEM_STL)[0]
-    TIB_STL = GMK_DIR + "/GMK_Sphere_right_5_tib.stl"
+    TIB_STL = GMK_DIR + "/KR_right_6_tib.stl"
     TIB_NAME = os.path.splitext(TIB_STL)[0]
     calibration = GMK_DIR + "/calibration.txt"
     
