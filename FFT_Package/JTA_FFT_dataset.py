@@ -14,7 +14,7 @@ class FFTDataset(Dataset):
     def __init__(self, image, transform):
 
         if os.path.isfile(image) == False:
-            raise Exception ("no iamge at this location")
+            raise Exception ("no image at this location")
         else:
             self.image = image
             self.transform = transform
