@@ -2,11 +2,8 @@
 # Copyright (c) Scott Banks banks@ufl.edu
 
 # Imports
-# from typing import OrderedDict
 from numpy.fft.helper import fftshift
 from numpy.lib.nanfunctions import _nansum_dispatcher
-# from torch._C import float32, uint8, unify_type_list
-from PIL import Image
 import vtk
 import numpy as np
 import math
@@ -19,11 +16,9 @@ from skimage import io
 import torch
 from torch import nn as nn
 from torch import optim as optim
-from torchvision import datasets, transforms, models
 from pose_hrnet_modded_in_notebook import PoseHighResolutionNet
 from collections import OrderedDict
 from JTA_FFT_dataset import *
-
 
 class JTA_FFT():
 
