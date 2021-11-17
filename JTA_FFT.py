@@ -649,7 +649,7 @@ class JTA_FFT():
     # Fix the units based on the location of the focal angle. Move z_est based on camera
         z_est_corr = z_est - self.pd
         if abs(z_est_corr) > abs(self.pd):
-            z_est_corr = - self.pd
+            z_est_corr[0] = - self.pd
 
     # Fix the rotations based on the projective geometry
         phi_x = np.arctan2(y_est, (self.pd - z_est)) * np.pi/180

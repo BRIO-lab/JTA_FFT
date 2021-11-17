@@ -4,16 +4,16 @@ from JTA_FFT import *
 import cv2
 
 def main():
-    HOME_DIR = "C:/Datasets_FemCleaned/Lima/Lima Testing/Patient 77-13-PF"
-    cal = HOME_DIR + "/calibration.txt"
+    HOME_DIR = "C:/Datasets_FemCleaned/Actiyas/Actiyas_Organized/T01L"
+    cal = HOME_DIR + "/cal1024.txt"
     FEM_NFD = JTA_FFT(cal)
     TIB_NFD = JTA_FFT(cal)
-    FEM_NFD.load_pickle(HOME_DIR + "/KR_left_7_fem.nfd")
-    TIB_NFD.load_pickle(HOME_DIR + "/KR_left_5_tib.nfd")
+    FEM_NFD.load_pickle(HOME_DIR + "/FemurL2_fem.nfd")
+    TIB_NFD.load_pickle(HOME_DIR + "/TibiaL3_tib.nfd")
     jts_fmt = '%16.9s,%16.9s,%16.9s,\t\t   %16.9s,%16.9s,%16.9s'
     jts_header = "JT_EULER_312\n          x_tran,          y_tran,          z_tran,                   z_rot,           x_rot,           y_rot"
 
-    for session in ["Session_1", "Session_2", "Session_3"]:
+    for session in ["Session_1"]:
         SESS_DIR = HOME_DIR + "/" + session
 
         for mvt in os.listdir(SESS_DIR):
