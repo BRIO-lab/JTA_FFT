@@ -29,7 +29,7 @@ Once this is completed, you have access to the following functions:
   - Takes in a provided x,y, and provides an NFD representation of them.
   - Returns a dict containing the centroid, mag, angle, and NFD for the passed-in x and y.
 - estimate_pose(instance)
-  - Takes in the instance's data from get_NFD, and estimates the pose for the passed-in instance data compared to the data saved in self (either generated with make contour lib or loaded in through a pickle). 
+  - Takes in the instance's data from get_NFD, and estimates the pose for the passed-in instance data compared to the data saved in self (either generated with create_NFD_library or loaded in through a pickle). 
   - Returns the estimated values for the pose.
 - load_pickle(pickle_path)
   - Takes in the path of the .nfd file (pickle) and loads the contained data into the toolkit.
