@@ -128,7 +128,8 @@ class JTA_FFT():
 
     def Make_Contour_Lib(self,STLFile):
 
-        # TODO: add function description 
+        # Takes in a path to an STL model, and generates a contour library based on it.
+        # This saves the generated rotation indices to self, and returns the x and y arrays of contours. 
 
         plt.clf()
 
