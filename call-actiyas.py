@@ -4,8 +4,8 @@ import glob
 import numpy as np
 
 def main():
-    DATA_DIR = "C:/Datasets_FemCleaned/Lima/Lima_Organized_Updated/"
-    NFD_DIR = "C:/Datasets_FemCleaned/Lima/NFD Library/lib/"
+    DATA_DIR = "C:/Datasets_FemCleaned/Toshi/Toshi_Organized/"
+    NFD_DIR = "C:/Datasets_FemCleaned/Toshi/NFD Library/lib/"
 
     for pat_id in os.listdir(DATA_DIR):
         
