@@ -1,7 +1,7 @@
 import enum
 import numpy as np
 import os
-from JTA_FFT import *
+import JTA_FFT
 import cv2
 import glob
 import gc
@@ -9,7 +9,7 @@ import gc
 
 def main():
     # A list of each of the studies for which we want to perform NFD estimations
-    study_list = ["Actiyas", "Arizona", "GMK", "Lima", "Toshi"]
+    study_list = ["Arizona"]
 
     # the main directory of the studies
     HOME_DIR = "C:/Datasets_FemCleaned"
@@ -79,6 +79,12 @@ def main():
                     tib_jts_file = np.empty([num_imgs,6])
 
                     # Checking to see which of the calibrations to use based on the file that we are working in
+
+                    for root, dirs, files in os.walk(mvt_dir):
+                        if files == "cal1024.txt":
+                            print(root,"/",files)
+
+                    
                     if os.path.exists(mvt_dir + "/cal1024.txt"):
                         calibration = mvt_dir + "/cal1024.txt"
                     else:
