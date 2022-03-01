@@ -34,13 +34,14 @@ class JTA_FFT():
         # Some of the coding variables
 
         # Number of Fourier Coefficients
-        self.nsamp = 128
+        self.nsamp = 256
+        # old was 128
 
         # Library Increment Parameters
         self.xrotmax = 45
-        self.xrotinc = 3
+        self.xrotinc = 1
         self.yrotmax = 45
-        self.yrotinc = 3
+        self.yrotinc = 1
 
         # Image Size
         self.imsize = 1024
@@ -505,8 +506,8 @@ class JTA_FFT():
                 # https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.interpolate.splev.html
                 self.x_new, self.y_new = splev(u_new, tck, der=0)
                 # Convert it back to numpy format for opencv to be able to display it
-                # plt.plot(x_new,self.imsize-y_new)
-                # plt.show()
+                plt.plot(self.x_new,self.imsize-self.y_new)
+                plt.show()
                 # commented out the line above to skip display window opening.
                 done = 1
             if done:
