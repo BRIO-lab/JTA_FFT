@@ -382,7 +382,12 @@ class JTA_FFT():
             # y is subtracted from imsize to accunct for image pixel coords
                 # FIXME: Need to fix the way that the FFT works, change norm
                 # norm = "ortho" should do the trick
-                fcoord = np.fft.fft((x_new + (self.imsize-y_new)*1j),nsamp)
+                #fcoord = np.fft.fft((x_new + (self.imsize-y_new)*1j),nsamp)
+                fcoord = np.fft.fft(
+                    a = (x + (self.imsize-y)*1j),
+                    n = nsamp,
+                    norm = "ortho"
+                )
                 print(fcoord.imag)
             # Shift so that the centroid of the projection is in the center
                 # FIXME: Fix this to normalize properly
@@ -528,7 +533,11 @@ class JTA_FFT():
 
         max_norms = 0
     # FIXME: Need to fix the normalization for the fourier transformation 
-        fcoord = np.fft.fft((x + (self.imsize-y)*1j),nsamp)
+        #fcoord = np.fft.fft((x + (self.imsize-y)*1j),nsamp)
+        fcoord = np.fft.fft(
+            a = (x + (self.imsize-y)*1j),
+            n = nsamp,
+            norm = "ortho")
         fcoord = np.fft.fftshift(fcoord)
 
         centroid_instance = (fcoord[int(nsamp/2)])
@@ -592,12 +601,12 @@ class JTA_FFT():
     # TODO: the following code adjusts for the incorrect normalization when creating the libs
     # TODO: this is only a placeholder
 
-        centroid_library = self.centroid_library / self.nsamp
-        centroid_instance = instance["centroid"] / self.nsamp
+        centroid_library = self.centroid_library
+        centroid_instance = instance["centroid"]
 
 
-        mag_library = self.mag_library / self.nsamp
-        mag_instance = instance["mag"] / self.nsamp
+        mag_library = self.mag_library
+        mag_instance = instance["mag"]
 
     # Loop through all the indices in the library and check the distance w instance
         for i in range(0,xspan):
