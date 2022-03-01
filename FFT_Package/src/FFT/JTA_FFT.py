@@ -34,7 +34,7 @@ class JTA_FFT():
         # Some of the coding variables
 
         # Number of Fourier Coefficients
-        self.nsamp = 256
+        self.nsamp = 128
         # old was 128
 
         # Library Increment Parameters
