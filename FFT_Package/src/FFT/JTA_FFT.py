@@ -39,9 +39,9 @@ class JTA_FFT():
 
         # Library Increment Parameters
         self.xrotmax = 45
-        self.xrotinc = 1
+        self.xrotinc = 3
         self.yrotmax = 45
-        self.yrotinc = 1
+        self.yrotinc = 3
 
         # Image Size
         self.imsize = 1024
