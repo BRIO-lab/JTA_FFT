@@ -1,9 +1,12 @@
-# JTA_FFT.py
+## JTA_FFT.py
 # Copyright (c) Scott Banks banks@ufl.edu
 
 # Imports
+# from typing import OrderedDict
 from numpy.fft.helper import fftshift
 from numpy.lib.nanfunctions import _nansum_dispatcher
+# from torch._C import float32, uint8, unify_type_list
+from PIL import Image
 import vtk
 import numpy as np
 import math
@@ -16,9 +19,11 @@ from skimage import io
 import torch
 from torch import nn as nn
 from torch import optim as optim
-from pose_hrnet_modded_in_notebook import PoseHighResolutionNet
+from torchvision import datasets, transforms, models
+#from pose_hrnet_modded_in_notebook import PoseHighResolutionNet
 from collections import OrderedDict
-from JTA_FFT_dataset import *
+#from JTA_FFT_dataset import *
+
 
 class JTA_FFT():
 
@@ -85,6 +90,10 @@ class JTA_FFT():
         # Takes in a NN Model and unprocessed image, and segments the image. 
         # This allows it to be compared to the shape library that is created further on.
 
+        '''
+        We planned to use this but do not use it - you can ignore what is happening here
+        '''
+
         # Load the model
         model = PoseHighResolutionNet(num_key_points=1,num_image_channels=1)
         cpu_model_state_dict = OrderedDict()
@@ -123,7 +132,12 @@ class JTA_FFT():
 
     def Make_Contour_Lib(self,STLFile):
 
-        # TODO: add function description 
+        # Takes in a path to an STL model, and generates a contour library based on it.
+        # This saves the generated rotation indices to self, and returns the x and y arrays of contours. 
+
+        '''
+        This is the function that creates the libraries for the contours. Meaning, it will take the current model and project/sample the contour to make a shape library
+        '''
 
         plt.clf()
 
@@ -273,11 +287,11 @@ class JTA_FFT():
 
                 for contour in contours:
                     x,y = contour.T
-
+                    
                 # Convert from numpy arrays to normal arrays
                     x = x.tolist()[0]
                     y = y.tolist()[0]
-
+                    
                     if len(x) > 200:
 
                     # Resample contour in nsamp equispaced increments using spline interpolation
@@ -290,11 +304,16 @@ class JTA_FFT():
                     # https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.interpolate.splev.html
                         x_new, y_new = splev(u_new, tck, der=0)
                         
+                        
                     # Convert it back to numpy format for opencv to be able to display it
                         plt.plot(x_new,self.imsize-y_new)
 
                     # break code if you are done
                         break
+                        
+                    else:
+                        x_new = 0
+                        y_new = 0
 
                 self.xout[j,k,:] = x_new
                 self.yout[j,k,:] = y_new
@@ -311,6 +330,9 @@ class JTA_FFT():
 
     def Create_NFD_Library(self):
         # TODO: fix the loading of different types for each of the sub-functions
+        '''
+        This function takes in the shape library created from the previous step and turns everything into a 
+        '''
 
         x = self.xout
         y = self.yout
@@ -596,7 +618,7 @@ class JTA_FFT():
         y_rot_est = self.rot_indices[idx,idy,1]
 
     # Now, find the z-rotation based on the library angle normalizations
-        z_rot_est = instance["angle_instance"][0] - self.angle_library[idx,idy,0]
+        z_rot_est = instance["angle"][0] - self.angle_library[idx,idy,0]
         z_rot_rad = z_rot_est * np.pi / 180
         z_rot_rad = -1*z_rot_rad
 
@@ -638,6 +660,8 @@ class JTA_FFT():
 
     # Fix the units based on the location of the focal angle. Move z_est based on camera
         z_est_corr = z_est - self.pd
+        if abs(z_est_corr) > abs(self.pd):
+            z_est_corr[0] = - self.pd
 
     # Fix the rotations based on the projective geometry
         phi_x = np.arctan2(y_est, (self.pd - z_est)) * np.pi/180
