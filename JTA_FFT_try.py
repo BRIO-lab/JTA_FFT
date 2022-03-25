@@ -1,5 +1,5 @@
 ## JTA_FFT.py
-# Copyright (c) Scott Banks banks@ufl.edu
+# Copyright (c) Scott Banks banks@ufl.edu, Andrew Jensen andrewjensen321@gmail.com
 
 # Imports
 # from typing import OrderedDict
@@ -26,7 +26,7 @@ import os
 #from JTA_FFT_dataset import *
 from rotation_utility import *
 from numba import jit
-
+# TODO: look into vtk-m
 class JTA_FFT():
     
     
@@ -232,11 +232,12 @@ class JTA_FFT():
 
         # take the FFT of the input contour
         # We subtract v_vals from imsize because we are correcting for the element locations of a pixel in an image
-        # this creates a 1D complex array using x and y values 
+        # this creates a 1D complex array using x and y values
         fcoord = np.fft.fft(
             (x_vals + (self.imsize - y_vals)*1j),
             nsamp
         )
+        
         
 
         # We shift the fft
