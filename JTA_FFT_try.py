@@ -18,10 +18,12 @@ import pickle
 #from pose_hrnet_modded_in_notebook import PoseHighResolutionNet
 from collections import OrderedDict
 import os
-#from JTA_FFT_dataset import *
 from rotation_utility import *
-from numba import jit
+import time 
+import nvtx
 # TODO: look into vtk-m
+
+
 class JTA_FFT():
     
     
@@ -101,7 +103,8 @@ class JTA_FFT():
         self.fx = fx
 
     # This is being called like a billion times, this function is what causes the create_nfd_library to be so fat
-    def create_projection(self, STLFile, renWin, renderer, transformFilter, stl_mapper, xr,yr,zr, translation = None):
+    @nvtx.annotate("create_projection", color = "purple")
+    def create_projection(self, STLFile,renWin, renderer, transformFilter, stl_mapper, xr,yr,zr, translation = None):
         # Takes in a path to an STL model, and generates a contour library based on it.
         # This saves the generated rotation indices to self, and returns the x and y arrays of contours. 
         n = lambda a: int(np.where(self.index_vect == a)[0][0])     # Lambda is used to specify an expression, Check where index_vect == a
@@ -211,6 +214,7 @@ class JTA_FFT():
         return x_new, y_new
     
      
+    @nvtx.annotate("create_NFD_from_contour", color = "red")
     def create_NFD_from_contour(self, x_vals, y_vals):
         '''
         This function takes a series of [x,y] values and converts them into a single FFT representation
@@ -232,10 +236,13 @@ class JTA_FFT():
         # take the FFT of the input contour
         # We subtract v_vals from imsize because we are correcting for the element locations of a pixel in an image
         # this creates a 1D complex array using x and y values
-        fcoord = np.fft.fft(
-            (x_vals + (self.imsize - y_vals)*1j),
-            nsamp
-        )
+        #TODO: can this be run in parallel
+        #TODO: see if this runs in normal python
+        with nvtx.annotate("fft call", color="blue"): # running in normal python?
+            fcoord = np.fft.fft(
+                (x_vals + (self.imsize - y_vals)*1j),
+                nsamp
+            )
         
         
 
@@ -297,6 +304,7 @@ class JTA_FFT():
         return centroid, magnitude, angle, NFD, m_k
 
      
+    @nvtx.annotate("shift", color = "blue") # i dont think this one is taking long at all, just going to toss it here in case
     def shift(self,nfd):
         '''
         This replaces the np.fft.fftshift due to issues with the shifting parameters
@@ -305,6 +313,7 @@ class JTA_FFT():
         return np.roll(nfd, shift_amount)
     
      
+    @nvtx.annotate("ishift", color = "blue")
     def ishift(self,nfd):
         '''
         This replaces np.fft.ifftshift based on our needs (off-by-one)
@@ -313,6 +322,7 @@ class JTA_FFT():
         return np.roll(nfd, shift_amount)
     
      
+    @nvtx.annotate("create_nfd_library", color = "green")
     def create_nfd_library(self, STLFile):
         '''
         This function creates an NFD library based on the STL and rotation indices that have been specified
@@ -339,7 +349,8 @@ class JTA_FFT():
                 rot_indices[j,k,0] = xr
                 rot_indices[j,k,1] = yr
 
-                
+                # Should these get wrapped in the profiler also?
+                # Does the time from the initial profiler add the time from each of these calls as well? Is it nested?
                 xval, yval = self.create_projection(STLFile, renWin, renderer, transformFilter, stl_mapper, xr, yr, 0)
                 cent,mag,ang,nfd,mk = self.create_NFD_from_contour(xval,yval)
                 centroid_library[j,k] = cent
@@ -353,7 +364,8 @@ class JTA_FFT():
         self.angle_library = angle_library
         self.NFD_library = NFD_library
 
-     
+    # probably not going to be running this because the data is a bit too hefty to add to the hipergator system.
+    @nvtx.annotate("estimate_pose", color = "orange")
     def estimate_pose(self,instance):
         '''
         Given an input NFD instance, this will determine the pose
@@ -477,6 +489,7 @@ class JTA_FFT():
         return x_est[0], y_est[0], z_est_corr[0], zr, xr, yr
 
      
+    @nvtx.annotate("save_nfd_library", color = "red")
     def save_nfd_library(self,filename):
         """ 
             Saves the necessary library variables into a dict for easier access after unpickling.
@@ -514,7 +527,8 @@ class JTA_FFT():
         except FileNotFoundError:
             print("Error! The file you are trying to load either does not exist, or does not exist at this location: ", pickle_path)
 
-     
+    
+    @nvtx.annotate("extract_contour_from_image", color = "green")
     def extract_contour_from_image(self, image):
         '''
         Extract the contour from a loaded image
@@ -565,7 +579,8 @@ class JTA_FFT():
 
         return x_new, y_new    
 
-     
+    
+    @nvtx.annotate("set_visualization_scene", color = "blue")
     def set_visualization_scene(self, STLFile):
         plt.clf()
 
@@ -644,6 +659,7 @@ class JTA_FFT():
         return renWin, renderer, transformFilter, stl_mapper
     
     
+    @nvtx.annotate("create_single_projection", color = "purple")
     def create_single_projection(self,STLFile, xr,yr,zr, translate = None):
 
         renWin, renderer, transformFilter, stl_mapper = self.set_visualization_scene(STLFile)
@@ -651,6 +667,7 @@ class JTA_FFT():
         return self.create_projection(STLFile, renWin, renderer, transformFilter, stl_mapper, xr, yr, zr, translate)
     
      
+    @nvtx.annotate("create_single_instance", color = "orange")
     def create_single_instance(self, STLFile, xr, yr, zr, translate = None):
 
         x, y = self.create_single_projection(STLFile, xr, yr, zr, translate)
@@ -666,7 +683,8 @@ class JTA_FFT():
         }
         return instance
 
-     
+     # TODO: make some of the different colors for better visualization
+    @nvtx.annotate("pose_from_segmentation", color = "purple")
     def pose_from_segmentation(self,image):
         '''
         This will take in the path to an image and return the pose at that specific value

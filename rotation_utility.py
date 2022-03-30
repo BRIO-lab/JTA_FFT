@@ -3,9 +3,9 @@ import kinproc.jtsFunctions
 import kinproc.process
 import kinproc.rot
 import kinproc.utility
-from numba import jit
+import nvtx
 
-
+@nvtx.annotate(f"()", color = "purple")
 def getRotations(sequence, matrix, rangerot2=0):
     # Calculate the corresponding Euler angles from a 3x3 rotation matrix 
     # using the specified sequence.
@@ -189,6 +189,7 @@ def getRotations(sequence, matrix, rangerot2=0):
 
 # The ambiguous pose function - determines the offset 
 
+@nvtx.annotate(f"()", color = "purple")
 def ambiguous_pose(pose):
     xr = kinproc.rot.x(pose[4])
     yr = kinproc.rot.y(pose[5])
@@ -209,6 +210,7 @@ def ambiguous_pose(pose):
 
 
 
+@nvtx.annotate(f"()", color = "purple")
 def ambiguous_pose_x(pose):
     xr = kinproc.rot.x(pose[4])
     yr = kinproc.rot.y(pose[5])
@@ -228,6 +230,7 @@ def ambiguous_pose_x(pose):
     return abs(angle_between - 90)
 
 
+@nvtx.annotate(f"()", color = "purple")
 def axis_angle_rotation_matrix(axis, angle):
     m = axis / np.linalg.norm(axis)
     c = np.cos(angle)
@@ -242,6 +245,7 @@ def axis_angle_rotation_matrix(axis, angle):
 
 
 
+@nvtx.annotate(f"()", color = "purple")
 def sym_trap_dual(pose):
     # First, we find the Rotation matrix that describes the pose in space.
     xr = kinproc.rot.x(pose[4])
