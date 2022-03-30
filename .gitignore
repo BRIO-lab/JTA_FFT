@@ -118,3 +118,4 @@ core.*
 *.qdrep
 /lima_files
 /old
+*.vscode
