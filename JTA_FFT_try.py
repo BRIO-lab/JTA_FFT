@@ -5,7 +5,6 @@
 # from typing import OrderedDict
 from numpy.fft.helper import fftshift
 from numpy.lib.nanfunctions import _nansum_dispatcher
-# from torch._C import float32, uint8, unify_type_list
 from PIL import Image
 import vtk
 import numpy as np
@@ -15,11 +14,7 @@ import cv2
 from scipy.interpolate import splprep, splev
 import matplotlib.pyplot as plt
 import pickle
-from skimage import io
-import torch
-from torch import nn as nn
-from torch import optim as optim
-from torchvision import datasets, transforms, models
+#from skimage import io
 #from pose_hrnet_modded_in_notebook import PoseHighResolutionNet
 from collections import OrderedDict
 import os
@@ -35,9 +30,11 @@ class JTA_FFT():
         self.max_num_norms = 5
         # Number of Fourier Coefficients
         self.nsamp = 128
-        # old was 128
-        self.index_vect = np.linspace(-self.nsamp/2 + 1, self.nsamp/2, self.nsamp)
-        # Library Increment Parameters
+        self.index_vect = np.linspace(-self.nsamp/2 + 1, self.nsamp/2, self.nsamp)  #linspace is a tool for creating numeric sequences (creates a sequence of evenly spaces numers in a numpy array)
+        
+        # Library Increment Parameters: How far will you rotate in the x and y directions. That grid of directions 
+        # Make it symmetric, 10 degree increments
+        # Doesn't really matter
         self.xrotmax = 30
         self.xrotinc = 3
         self.yrotmax = 30
@@ -49,7 +46,9 @@ class JTA_FFT():
         # Load in calibration file and check for proper formatting
         cal_data = np.loadtxt(CalFile, skiprows=1)
         self.CalFile = CalFile
-        with open(CalFile, "r") as cal:
+
+        # Make sure that the proper calibration file is being used
+        with open(CalFile, "r") as cal: 
             if (cal.readline().strip() != "JT_INTCALIB"):
                 raise Exception("Error! The provided calibration file has an incorrect header.")
         
@@ -64,11 +63,11 @@ class JTA_FFT():
         
         # principal distance
         pd = cal_data[0]
-        self.pd = pd
+        self.pd = pd    # was 1200 mm in Dr.Banks code
 
         # scale (mm/px)
         sc = cal_data[3]
-        self.sc = sc
+        self.sc = sc    # 0.373 (all of this should be taken from calibration file)
 
         # x and y offset
         xo = cal_data[1]
@@ -101,11 +100,11 @@ class JTA_FFT():
         self.isc = isc
         self.fx = fx
 
-    
-    def create_projection(self, STLFile,renWin, renderer, transformFilter, stl_mapper, xr,yr,zr, translation = None):
+    # This is being called like a billion times, this function is what causes the create_nfd_library to be so fat
+    def create_projection(self, STLFile, renWin, renderer, transformFilter, stl_mapper, xr,yr,zr, translation = None):
         # Takes in a path to an STL model, and generates a contour library based on it.
         # This saves the generated rotation indices to self, and returns the x and y arrays of contours. 
-        n = lambda a: int(np.where(self.index_vect == a)[0][0])
+        n = lambda a: int(np.where(self.index_vect == a)[0][0])     # Lambda is used to specify an expression, Check where index_vect == a
         A = lambda a: int(self.index_vect[a])
         '''
         This is the function that creates the libraries for the contours. Meaning, it will take the current model and project/sample the contour to make a shape library
