@@ -21,6 +21,7 @@ import os
 from rotation_utility import *
 import time 
 import nvtx
+import cunumeric
 # TODO: look into vtk-m
 
 
