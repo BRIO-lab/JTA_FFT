@@ -168,7 +168,10 @@ class JTA_FFT():
         arr = cv2.flip(numpy_support.vtk_to_numpy(vtk_array).reshape(height,width,components),0)
         arr = cv2.cvtColor(arr, cv2.COLOR_BGR2GRAY)
         _, binary = cv2.threshold(arr, 1, 255, cv2.THRESH_BINARY)
-        kernel = np.ones((5,5),np.uint8)
+        
+        #################### Not sure if uint8 can be called with cuNumeric
+        kernel =cn.ones((5,5),np.uint8)
+
         binary = cv2.dilate(binary, kernel, iterations = 1)
         binary = cv2.erode(binary, kernel, iterations = 1)
     
@@ -190,7 +193,7 @@ class JTA_FFT():
                 tck, u = splprep([x,y], u=None, s=1.0, per=1)
             
             # https://docs.scipy.org/doc/numpy-1.10.1/reference/generated/numpy.linspace.html
-                u_new = np.linspace(u.min(), u.max(), self.nsamp)
+                u_new =cn.linspace(u.min(), u.max(), self.nsamp)
             
             # https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.interpolate.splev.html
                 x_new, y_new = splev(u_new, tck, der=0)
@@ -216,7 +219,7 @@ class JTA_FFT():
         '''
         This function takes a series of [x,y] values and converts them into a single FFT representation
         '''
-        n = lambda a: int(np.where(self.index_vect == a)[0][0])
+        n = lambda a: cn.where(self.index_vect == a)[0][0])
         A = lambda a: int(self.index_vect[a])
 
         # store the number of samples locally for easier typing
@@ -224,11 +227,11 @@ class JTA_FFT():
         max_norms = 0
 
         # a list of the possible normalization coefficients that might be used
-        possible_k_values = np.array([2,-1,-2,-3,-4])
+        possible_k_values =cn.array([2,-1,-2,-3,-4])
         
         # initialize the different values that we are going to fill in as we calculate and normalize
-        NFD = np.zeros([possible_k_values.shape[0], nsamp], dtype = 'c16')
-        angle = np.zeros([possible_k_values.shape[0]])
+        NFD =cn.zeros([possible_k_values.shape[0], nsamp], dtype = 'c16')
+        angle = cn.zeros([possible_k_values.shape[0]])
 
         # take the FFT of the input contour
         # We subtract v_vals from imsize because we are correcting for the element locations of a pixel in an image
@@ -259,7 +262,7 @@ class JTA_FFT():
         fcoord = fcoord / magnitude
         self.testing_fcoord = fcoord[:]
         # Now, we want to find the value of k, where A(k) is the second largest magnitude in the fft
-        idx = np.argsort(abs(fcoord))
+        idx =cn.argsort(abs(fcoord))
         idx = idx[::-1] # reverse the order 
 
         k_index = idx[1] # second largest value
@@ -275,25 +278,26 @@ class JTA_FFT():
         for norm_num, k in enumerate(possible_k_values):
 
             # u = phase of A(1)
-            u = np.arctan2(
+            u = cn.arctan2(
                         fcoord.imag[n(1)],
                         fcoord.real[n(1)]
                     )
 
             # v = phase of A(k)
 
-            v = np.arctan2(
+            v = cn.arctan2(
                 fcoord.imag[n(k)],
                 fcoord.real[n(k)]
             )
 
             # Calculate the specific angle instance of the rotation
+        #################### Not sure if uint8 can be called with cuNumeric
 
             angle[norm_num] = ((v - k*u)/(k-1))*(180./np.pi)
 
             # calculate the rotation and shift starting point normalization for the contour
-            ang = [((x - k)*u + (1 - x)*v)/(k-1) for x in np.linspace(-self.nsamp/2 + 1, self.nsamp / 2, self.nsamp)]
-            coeff = [np.exp(1j*x) for x in ang]
+            ang = [((x - k)*u + (1 - x)*v)/(k-1) for x in cn.linspace(-self.nsamp/2 + 1, self.nsamp / 2, self.nsamp)]
+            coeff = [cn.exp(1j*x) for x in ang]
 
             NFD[norm_num,:] = fcoord*coeff
         
@@ -326,20 +330,20 @@ class JTA_FFT():
         '''
 
         # define our rotation parameters
-        xrot = np.linspace(int(-1*self.xrotmax),
+        xrot =cn.linspace(int(-1*self.xrotmax),
                            int(self.xrotmax),
                            int((2*self.xrotmax/self.xrotinc))+1)
         
-        yrot = np.linspace(int(-1*self.yrotmax),
+        yrot = cn.linspace(int(-1*self.yrotmax),
                            int(self.yrotmax),
                            int((2*self.yrotmax/self.yrotinc))+1)
 
         # create all the different values that we are going to fill up
-        rot_indices = np.empty([xrot.size, yrot.size, 2])
-        NFD_library = np.zeros([xrot.size, yrot.size, self.max_num_norms,self.nsamp], dtype = 'c16')
-        angle_library = np.zeros([xrot.size, yrot.size, self.max_num_norms])
-        magnitude_library = np.zeros([xrot.size, yrot.size])
-        centroid_library = np.zeros([xrot.size, yrot.size], dtype='c16')
+        rot_indices =cn.empty([xrot.size, yrot.size, 2])
+        NFD_library = cn.zeros([xrot.size, yrot.size, self.max_num_norms,self.nsamp], dtype = 'c16')
+        angle_library = cn.zeros([xrot.size, yrot.size, self.max_num_norms])
+        magnitude_library = cn.zeros([xrot.size, yrot.size])
+        centroid_library = cn.zeros([xrot.size, yrot.size], dtype='c16')
         renWin, renderer, transformFilter, stl_mapper = self.set_visualization_scene(STLFile)
         for j, xr in enumerate(xrot):
             for k, yr in enumerate(yrot):
@@ -371,7 +375,7 @@ class JTA_FFT():
         xspan = self.NFD_library.shape[0]
         yspan = self.NFD_library.shape[1]
 
-        dist = np.empty([xspan, yspan])
+        dist =cn.empty([xspan, yspan])
 
         # We have to divide by the nsamp because of the noramlization method used in the FFT
 
@@ -388,7 +392,7 @@ class JTA_FFT():
                 dist[i,j] = diff
         
 
-        idx,idy = np.where(dist == dist.min())
+        idx,idy =cn.where(dist == dist.min())
         #print(idx,idy)
         x_rot_est = self.rot_indices[idx,idy,0]
         y_rot_est = self.rot_indices[idx,idy,1]
@@ -416,14 +420,16 @@ class JTA_FFT():
 
     # Now, calculate the location of the estimated x and y translation based on centroid and roatation
 
-        rot = np.array([[math.cos(z_rot_rad),-math.sin(z_rot_rad)],
+        rot =cn.array([[math.cos(z_rot_rad),-math.sin(z_rot_rad)],
                         [math.sin(z_rot_rad), math.cos(z_rot_rad)]])
         
         x_inst = centroid_instance.real - x_offset
         y_inst = centroid_instance.imag - y_offset
 
-        t_inst = np.array([[x_inst],[y_inst]])
-        t_lib  = np.array([[x_lib[0]],[y_lib[0]]])
+        t_inst = cn.array([[x_inst],[y_inst]])
+        t_lib  = cn.array([[x_lib[0]],[y_lib[0]]])
+
+                #################### Not sure if matmul can be called with cuNumeric
         t_est_px = t_inst - np.matmul(rot,t_lib)
         t_est_len = t_est_px * self.sc
 
@@ -440,30 +446,34 @@ class JTA_FFT():
         x_est = x_est * (z_est_corr / -self.pd) + self.xo
         y_est = y_est * (z_est_corr / -self.pd) + self.yo
     # Fix the rotations based on the projective geometry
-        phi_x = np.arctan2(y_est, (self.pd - z_est))
-        phi_y = np.arctan2(x_est, (self.pd - z_est))
+        phi_x = cn.arctan2(y_est, (self.pd - z_est))
+        phi_y = cn.arctan2(x_est, (self.pd - z_est))
 
         #x_rot_corr = x_rot_est + (np.cos(z_rot_rad)*phi_x - np.sin(z_rot_rad)*phi_y) * 180/np.pi
         #y_rot_corr = y_rot_est - (np.sin(z_rot_rad)*phi_x - np.cos(z_rot_rad)*phi_y)*180/np.pi
         
-        rot_corr = np.array([
-            [-np.cos(z_rot_rad), np.sin(z_rot_rad)],
-            [np.sin(z_rot_rad), np.cos(z_rot_rad)]
+        rot_corr = cn.array([
+            [-cn.cos(z_rot_rad), cn.sin(z_rot_rad)],
+            [cn.sin(z_rot_rad), cn.cos(z_rot_rad)]
         ])
-        rotation_correction = np.matmul(rot_corr, np.array([[phi_x],[phi_y]]))
+
+                        #################### Not sure if matmul can be called with cuNumeric
+        rotation_correction = np.matmul(rot_corr, cn.array([[phi_x],[phi_y]]))
         
+
+                                #################### Not sure if pi can be called with cuNumeric
         x_rot_corr = x_rot_est - rotation_correction[0] * 180/np.pi
         y_rot_corr = y_rot_est - rotation_correction[1] * 180/np.pi
         
         
-        vector1 = np.array([
+        vector1 = cn.array([
             (x_lib[0])*self.sc,
             (y_lib[0])*self.sc,
             -0.9*self.pd
         ])
         
         
-        vector2 = np.array([
+        vector2 = cn.array([
             x_est[0],
             y_est[0],
             z_est_corr[0]
@@ -477,6 +487,8 @@ class JTA_FFT():
         rot_at_origin = create_rotation_matrix_312(z_rot_est[0], x_rot_est[0], y_rot_est[0])
         
         # now, we apply the rotation from the value at the origin
+
+                                #################### Not sure if matmul can be called with cuNumeric
         new_rot = np.matmul(rot_at_origin,rot_corr)
         
         # extract the rotations
@@ -540,7 +552,7 @@ class JTA_FFT():
             print("Could not load image")
         
         # apply a contour detector on the image
-        kernel = np.ones([5,5], np.uint8)
+        kernel = cn.ones([5,5], np.uint8)
         binary = cv2.dilate(img, kernel, iterations = 1)
         binary = cv2.erode(binary, kernel, iterations = 1)
 
@@ -562,7 +574,7 @@ class JTA_FFT():
                 # https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.interpolate.splprep.html
                 tck, u = splprep([x,y], u=None, s=1.0, per=1)
                 # https://docs.scipy.org/doc/numpy-1.10.1/reference/generated/numpy.linspace.html
-                u_new = np.linspace(u.min(), u.max(), self.nsamp)
+                u_new = cn.linspace(u.min(), u.max(), self.nsamp)
                 #u_new = np.linspace(u.min(), u.max(), 64)
                 # https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.interpolate.splev.html
                 x_new, y_new = splev(u_new, tck, der=0)
@@ -611,13 +623,13 @@ class JTA_FFT():
     
     # Set vertical view angle as an indirect way of 
     # setting the y focal distance
-        angle = (180 / np.pi) * 2.0 * np.arctan2(self.imsize/2, fy)
+        angle = (180 / np.pi) * 2.0 * cn.arctan2(self.imsize/2, fy)
         cam.SetViewAngle(angle)
 
     # Set vertical view angle as an indirect way of
     # setting the x focal distance
 
-        m = np.eye(4)
+        m =cn.eye(4)
         aspect = fy/fx
         m[0,0] = 1.0/aspect
         t = vtk.vtkTransform()
@@ -709,7 +721,7 @@ class JTA_FFT():
         xspan = self.NFD_library.shape[0]
         yspan = self.NFD_library.shape[1]
 
-        dist = np.empty([xspan, yspan, 5])
+        dist = cn.empty([xspan, yspan, 5])
         
         # First, we want to grab the magnitude of the current library and 
         # normalize for all the different values
@@ -725,7 +737,7 @@ class JTA_FFT():
         
         # Now, we know the rotation indices for the value at the given location
         # take the smallest distance
-        idx,idy, norm_idx = np.where(dist == dist.min())
+        idx,idy, norm_idx =cn.where(dist == dist.min())
         #print(self.rot_indices[idx,idy])
         #print(self.rot_indices[idx,idy].shape)
         # This gives us values for all the different library indices 
@@ -766,8 +778,8 @@ class JTA_FFT():
         x_lib = (cent_lib.real / self.nsamp) - 512
         y_lib = (cent_lib.imag / self.nsamp) - 512
         #print("Centroid_lib: ", x_lib, y_lib)
-        cz = np.cos(z_rot_rad)
-        sz = np.sin(z_rot_rad)
+        cz = cn.cos(z_rot_rad)
+        sz = cn.sin(z_rot_rad)
         centroid_zoom = (self.pd - z_lib)/(self.pd - z_est)
         #print("zoom factoprs: ",centroid_zoom, (inst["magnitude"]/self.magnitude_library[idx,idy]))
         
@@ -785,13 +797,13 @@ class JTA_FFT():
         # now to adjust for rotation estimates based on the perspective shift
         # going to correct by making an axis-angle representation
         
-        v1 = np.array([
+        v1 = cn.array([
             0,
             0,
             self.pd - z_est[0]
         ])
         
-        v2 = np.array([
+        v2 = cn.array([
             x_final[0],
             y_final[0],
             self.pd - z_est[0]    
@@ -807,8 +819,8 @@ class JTA_FFT():
         
         z_rot, x_rot_final, y_rot_final = getRotations("312",final_rot)
         
-        phi_x = np.arctan2(y_final, abs(z_final))
-        phi_y = np.arctan2(x_final, abs(z_final))
+        phi_x = cn.arctan2(y_final, abs(z_final))
+        phi_y = cn.arctan2(x_final, abs(z_final))
         
         #x_rot_final = (x_rot_est + np.rad2deg((-cz*phi_x + sz*phi_y)))[0]
         #y_rot_final = (y_rot_est + np.rad2deg((sz*phi_x + cz*phi_y)))[0]
@@ -855,8 +867,8 @@ class JTA_FFT():
                 angle = self.angle_library[i,j][norm] * np.pi / 180
                 x_cent = self.rot_indices[i,j][0]
                 y_cent = self.rot_indices[i,j][1]
-                clock_x = [x_cent,x_cent + np.cos(angle)*clock_arm_length ]
-                clock_y = [y_cent, y_cent + np.sin(angle)*clock_arm_length]
+                clock_x = [x_cent,x_cent + cn.cos(angle)*clock_arm_length ]
+                clock_y = [y_cent, y_cent + cn.sin(angle)*clock_arm_length]
 
                 x = inv.real*scale + x_cent
                 y = inv.imag*scale + y_cent
@@ -878,8 +890,8 @@ class JTA_FFT():
         angle = instance["angle"][norm] * np.pi / 180
         x_cent = 0
         y_cent = 0
-        clock_x = [x_cent,x_cent + np.cos(angle)*clock_arm_length ]
-        clock_y = [y_cent, y_cent + np.sin(angle)*clock_arm_length]
+        clock_x = [x_cent,x_cent + cn.cos(angle)*clock_arm_length ]
+        clock_y = [y_cent, y_cent + cn.sin(angle)*clock_arm_length]
         x = inv.real*scale + x_cent
         y = inv.imag*scale + y_cent
         ax.plot(x,y, linewidth = 4)
