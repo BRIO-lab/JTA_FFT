@@ -21,7 +21,7 @@ import os
 from rotation_utility import *
 import time 
 import nvtx
-import cunumeric
+import cunumeric as cn
 # TODO: look into vtk-m
 
 
@@ -34,7 +34,8 @@ class JTA_FFT():
         # Number of Fourier Coefficients
         self.nsamp = 128
         # old was 128
-        self.index_vect = np.linspace(-self.nsamp/2 + 1, self.nsamp/2, self.nsamp)
+        self.index_vect = cn
+        .linspace(-self.nsamp/2 + 1, self.nsamp/2, self.nsamp)
         # Library Increment Parameters
         self.xrotmax = 30
         self.xrotinc = 3
@@ -103,7 +104,7 @@ class JTA_FFT():
     def create_projection(self, STLFile,renWin, renderer, transformFilter, stl_mapper, xr,yr,zr, translation = None):
         # Takes in a path to an STL model, and generates a contour library based on it.
         # This saves the generated rotation indices to self, and returns the x and y arrays of contours. 
-        n = lambda a: int(np.where(self.index_vect == a)[0][0])
+        n = lambda a: int(cn.where(self.index_vect == a)[0][0])
         A = lambda a: int(self.index_vect[a])
         '''
         This is the function that creates the libraries for the contours. Meaning, it will take the current model and project/sample the contour to make a shape library
@@ -112,11 +113,11 @@ class JTA_FFT():
         
 
     # Define Rotations for library
-        xrot = np.linspace(int(-1*self.xrotmax),
+        xrot = cn.linspace(int(-1*self.xrotmax),
                            int(self.xrotmax),
                            int((2*self.xrotmax/self.xrotinc))+1)
         
-        yrot = np.linspace(int(-1*self.yrotmax),
+        yrot = cn.linspace(int(-1*self.yrotmax),
                            int(self.yrotmax),
                            int((2*self.yrotmax/self.yrotinc))+1) 
 
@@ -130,7 +131,7 @@ class JTA_FFT():
     #                          self.nsamp])
 
     # Create array to store rotation indices
-        rot_indices = np.empty([xrot.size,yrot.size,2])
+        rot_indices = cn.empty([xrot.size,yrot.size,2])
 
     # Create for-loop to run through each of the rotation combinations
     # Transform the STL model based on the current rotation
