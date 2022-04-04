@@ -42,7 +42,7 @@ class JTA_FFT():
 
         # Image Size
         self.imsize = 1024
-
+        
         # Load in calibration file and check for proper formatting
         cal_data = np.loadtxt(CalFile, skiprows=1)
         self.CalFile = CalFile
