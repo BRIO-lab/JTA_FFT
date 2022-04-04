@@ -1,0 +1,14 @@
+
+Things to do
+-   Check how images are loaded into the program (is it done int batches?)
+-   Find out how to do parallel computing o a for loop
+    -   Ray
+    -   CuPy
+    -   Chainer
+    -   Numba
+    -   Dask
+    -   PyCuda (harder)
+
+    https://carpentries-incubator.github.io/gpu-speedups/01_CuPy_and_Numba_on_the_GPU/index.html
+
+pass in an array of values instead of doing it in a forloop

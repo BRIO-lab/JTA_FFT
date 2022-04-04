@@ -23,5 +23,8 @@ if __name__ == '__main__':
     for i in my_array2:
         answer2 = sumall(i)
     print("The time for for loop: ", time.time() - start_time2)
+    
+    
+
 
     
