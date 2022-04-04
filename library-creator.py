@@ -8,7 +8,7 @@ import nvtx
 @nvtx.annotate("Library-Creator", color = "blue")
 def main():
     HOME_DIR = "/red/nvidia-ai/miller-lab/data"
-    study_list = ["d]
+    study_list = ["GMK"]
     
     for study in study_list:
         study_dir = HOME_DIR + "/" + study
