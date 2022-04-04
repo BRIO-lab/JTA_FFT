@@ -32,7 +32,7 @@ class JTA_FFT():
         # Number of Fourier Coefficients
         self.nsamp = 128
         #linspace is a tool for creating numeric sequences (creates a sequence of evenly spaces numers in a numpy array)
-        self.index_vect = cp.linspace(-self.nsamp/2 + 1, self.nsamp/2, self.nsamp)  #FIXME: np -> cp
+        self.index_vect = np.linspace(-self.nsamp/2 + 1, self.nsamp/2, self.nsamp)  #FIXME: np -> cp
         
         # Library Increment Parameters: How far will you rotate in the x and y directions. That grid of directions 
         # Make it symmetric, 10 degree increments
@@ -46,7 +46,7 @@ class JTA_FFT():
         self.imsize = 1024
 
         # Load in calibration file and check for proper formatting
-        cal_data = cp.loadtxt(CalFile, skiprows=1)    #FIXME: np -> cp
+        cal_data = np.loadtxt(CalFile, skiprows=1)    #FIXME: np -> cp
         
         self.CalFile = CalFile
 
@@ -108,7 +108,7 @@ class JTA_FFT():
     def create_projection(self, STLFile,renWin, renderer, transformFilter, stl_mapper, xr,yr,zr, translation = None):
         # Takes in a path to an STL model, and generates a contour library based on it.
         # This saves the generated rotation indices to self, and returns the x and y arrays of contours. 
-        n = lambda a: int(cp.where(self.index_vect == a)[0][0])     # Lambda is used to specify an expression, Check where index_vect == a   #FIXME: np -> cp
+        n = lambda a: int(np.where(self.index_vect == a)[0][0])     # Lambda is used to specify an expression, Check where index_vect == a   #FIXME: np -> cp
 
         A = lambda a: int(self.index_vect[a])
         '''
@@ -118,11 +118,11 @@ class JTA_FFT():
         
 
     # Define Rotations for library      #FIXME: np -> cp
-        xrot = cp.linspace(int(-1*self.xrotmax),
+        xrot = np.linspace(int(-1*self.xrotmax),
                            int(self.xrotmax),
                            int((2*self.xrotmax/self.xrotinc))+1)
         
-        yrot = cp.linspace(int(-1*self.yrotmax),
+        yrot = np.linspace(int(-1*self.yrotmax),
                            int(self.yrotmax),
                            int((2*self.yrotmax/self.yrotinc))+1) 
     
@@ -174,7 +174,7 @@ class JTA_FFT():
         arr = cv2.flip(numpy_support.vtk_to_numpy(vtk_array).reshape(height,width,components),0)
         arr = cv2.cvtColor(arr, cv2.COLOR_BGR2GRAY)
         _, binary = cv2.threshold(arr, 1, 255, cv2.THRESH_BINARY)
-        kernel = cp.ones((5,5),cp.uint8)    #FIXME: np -> cp
+        kernel = np.ones((5,5),np.uint8)    #FIXME: np -> cp
         binary = cv2.dilate(binary, kernel, iterations = 1)
         binary = cv2.erode(binary, kernel, iterations = 1)
     
@@ -196,7 +196,7 @@ class JTA_FFT():
                 tck, u = splprep([x,y], u=None, s=1.0, per=1)
             
             # https://docs.scipy.org/doc/numpy-1.10.1/reference/generated/numpy.linspace.html
-                u_new = cp.linspace(u.min(), u.max(), self.nsamp)   #FIXME: np -> cp
+                u_new = np.linspace(u.min(), u.max(), self.nsamp)   #FIXME: np -> cp
             
             # https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.interpolate.splev.html
                 x_new, y_new = splev(u_new, tck, der=0)
@@ -222,7 +222,7 @@ class JTA_FFT():
         '''
         This function takes a series of [x,y] values and converts them into a single FFT representation
         '''
-        n = lambda a: int(cp.where(self.index_vect == a)[0][0]) #FIXME: np -> cp
+        n = lambda a: int(np.where(self.index_vect == a)[0][0]) #FIXME: np -> cp
         A = lambda a: int(self.index_vect[a])
 
         # store the number of samples locally for easier typing
@@ -230,11 +230,11 @@ class JTA_FFT():
         max_norms = 0
 
         # a list of the possible normalization coefficients that might be used
-        possible_k_values = cp.array([2,-1,-2,-3,-4])   #FIXME: np -> cp
+        possible_k_values = np.array([2,-1,-2,-3,-4])   #FIXME: np -> cp
         
         # initialize the different values that we are going to fill in as we calculate and normalize
-        NFD = cp.zeros([possible_k_values.shape[0], nsamp], dtype = 'c16') #FIXME: np -> cp
-        angle = cp.zeros([possible_k_values.shape[0]])
+        NFD = np.zeros([possible_k_values.shape[0], nsamp], dtype = 'c16') #FIXME: np -> cp
+        angle = np.zeros([possible_k_values.shape[0]])
 
         # take the FFT of the input contour
         # We subtract v_vals from imsize because we are correcting for the element locations of a pixel in an image
@@ -242,7 +242,7 @@ class JTA_FFT():
         #TODO: can this be run in parallel
         #TODO: see if this runs in normal python
         with nvtx.annotate("fft call", color="blue"): # running in normal python?
-            fcoord = cp.fft.fft(        #FIXME: np -> cp
+            fcoord = cp.fft.fft(        
                 (x_vals + (self.imsize - y_vals)*1j),
                 nsamp
             )
@@ -265,7 +265,7 @@ class JTA_FFT():
         fcoord = fcoord / magnitude
         self.testing_fcoord = fcoord[:]
         # Now, we want to find the value of k, where A(k) is the second largest magnitude in the fft
-        idx = cp.argsort(abs(fcoord))   #FIXME: np -> cp
+        idx = np.argsort(abs(fcoord))  
         idx = idx[::-1] # reverse the order 
 
         k_index = idx[1] # second largest value
@@ -295,7 +295,7 @@ class JTA_FFT():
 
             # Calculate the specific angle instance of the rotation
 
-            angle[norm_num] = ((v - k*u)/(k-1))*(180./np.pi)
+            angle[norm_num] = ((v - k*u)/(k-1))*(180./np.pi)    
 
             # calculate the rotation and shift starting point normalization for the contour
             ang = [((x - k)*u + (1 - x)*v)/(k-1) for x in np.linspace(-self.nsamp/2 + 1, self.nsamp / 2, self.nsamp)]
@@ -313,7 +313,7 @@ class JTA_FFT():
         This replaces the np.fft.fftshift due to issues with the shifting parameters
         '''
         shift_amount = [((dim // 2) - 1) for dim in nfd.shape ]
-        return np.roll(nfd, shift_amount)
+        return np.roll(nfd, shift_amount)   
     
      
     @nvtx.annotate("ishift", color = "blue")
