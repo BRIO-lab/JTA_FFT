@@ -5,6 +5,7 @@ import math
 import time
 
 start_time = time.time()
+
 @cuda.jit(device=True)
 def polar_to_cartesian(rho, theta):
     x = rho * math.cos(theta)

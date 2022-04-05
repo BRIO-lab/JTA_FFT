@@ -137,7 +137,7 @@ class JTA_FFT():
     #                          self.nsamp])
 
     # Create array to store rotation indices
-        rot_indices = cp.empty([xrot.size,yrot.size,2])
+        rot_indices = np.empty([xrot.size,yrot.size,2])
 
     # Create for-loop to run through each of the rotation combinations
     # Transform the STL model based on the current rotation

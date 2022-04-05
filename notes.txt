@@ -12,3 +12,45 @@ Things to do
     https://carpentries-incubator.github.io/gpu-speedups/01_CuPy_and_Numba_on_the_GPU/index.html
 
 pass in an array of values instead of doing it in a forloop
+
+
+-------------------------------------Numba Notes----------------------------------------
+
+@jit: Mark a function for optimization by numba's JIT compiler.
+-   Lazy compilation
+-   Eager compilation 
+
+To make it compile with no python at first (can speed it up). Read documentation (@njit)
+@jit(nopython=True)
+def f(x, y):
+    return x + y
+
+@jit(nogil=True)
+def f(x, y):
+    return x + y
+
+
+To avoid compilation times each time you invoke a Python program, you can
+instruct numba to write the result of function compilation into a file-based
+cache
+@jit(cache=True)
+def f(x, y):
+    return x + y
+
+'parallel' enables automatic parallelization (and related optimizations) in the
+function known to have parallel semantics. For a list of supported operations:
+https://numba.pydata.org/numba-doc/latest/user/parallel.html#numba-parallel
+This feature is enabled by passing parallel = True
+@jit(nopython=True, parallel=True)
+def f(x, y):
+    return x + y
+
+
+
+@vectorize: Used for functions which operate on scalars (universal functions, ufuncs)
+Using the vectorize() decorator, numba can compile a pure python function into a ufunct 
+that operates over a NumPy array as fast as traditional ufuncs in c
+-   Write function as operating over INPUT scalars (instead of ARRAYS)
+    -   Numba generatessurrounding loop (or kernel) allowing efficient iteration over actual inputs
+-   Eager compilation
+-   Lazy compilation
