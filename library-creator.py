@@ -32,7 +32,7 @@ def main():
             else:
                 NFD = JTA_FFT(cal)
                 NFD.create_nfd_library(stl_path)
-                NFD.save_nfd_library(NFD_DIR + stl_name)
+                NFD.save_nfd_library('/red/nvidia-ai/sasank.desaraju/' + stl_name)
                 del(NFD)
 
 

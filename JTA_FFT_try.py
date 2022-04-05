@@ -8,7 +8,7 @@
 from PIL import Image
 import vtk
 #import numpy as np
-import cunumeric as np
+import numpy as np
 import math
 from vtk.util import numpy_support
 import cv2
@@ -90,6 +90,7 @@ class JTA_FFT():
 
         isc = 1/self.sc      # inverse scale [px/mm]
         fx = self.pd/self.sc # scale pd into pixel units
+        # What are the below variables that are not saved as self.something? Are they global variables???
         fy = fx              # same pd in x and y
         cx = self.imsize/2   # project to image center
         cy = cx              # same x and y image center
