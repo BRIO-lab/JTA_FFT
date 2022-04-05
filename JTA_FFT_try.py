@@ -10,6 +10,7 @@ import vtk
 #import numpy as np
 import cunumeric as np
 import math
+from JTA_FFT.splineInterpCL.splinecl import splinecl
 from vtk.util import numpy_support
 import cv2
 from scipy.interpolate import splprep, splev
@@ -21,6 +22,7 @@ import os
 from rotation_utility import *
 import time 
 import nvtx
+
 # TODO: look into vtk-m
 
 
@@ -558,6 +560,7 @@ class JTA_FFT():
 
                 # Resample contour in nsamp equispaced increments using spline interpolation
                 # https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.interpolate.splprep.html
+                
                 tck, u = splprep([x,y], u=None, s=1.0, per=1)
                 # https://docs.scipy.org/doc/numpy-1.10.1/reference/generated/numpy.linspace.html
                 u_new = np.linspace(u.min(), u.max(), self.nsamp)
