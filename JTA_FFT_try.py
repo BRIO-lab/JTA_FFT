@@ -371,7 +371,7 @@ class JTA_FFT():
 
         dist = np.empty([xspan, yspan])
 
-        # We have to divide by the nsamp because of the noramlization method used in the FFT
+        # We have to divide by the nsamp because of the normalization method used in the FFT
 
         centroid_library = self.centroid_library / self.nsamp
         centroid_instance = instance["centroid"] / self.nsamp
