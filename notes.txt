@@ -54,3 +54,48 @@ that operates over a NumPy array as fast as traditional ufuncs in c
     -   Numba generatessurrounding loop (or kernel) allowing efficient iteration over actual inputs
 -   Eager compilation
 -   Lazy compilation
+
+
+------------------OOP on CUDA----------------
+Object-oriented programming (OOP) is often regarded as too inefficient for highperformance 
+computing (HPC), even though many important HPC problems have an inherent object structure
+
+CUDA code is split into two parts tge host code (CPU) and the device (GPU). Host code
+can be OOP (because it takes C++). the GPU is in C which does not have OOP functionality
+
+Error thrown (2022):
+TypeError: class members are not yet supported: create_NFD_from_contour, create_nfd_library
+
+
+----------- testing.py times---------------
+Normal class without numba functionality (numpy)
+Time:  45.416595458984375
+
+Using @jitclass(spec): This should be parallelizing on the CPU (numba, numpy)
+Time:  2.133568525314331
+
+---------- now, removed OO structure ----------
+Try rewriting without OO structure (no numba with numpy)
+Time: 42.20407009124756
+
+Using cupy without OO structure
+Time:  197.21771550178528
+
+iterally just tagged @jit to the top of each function with numpy (cupy didn't work)
+Time:  1.922593116760254
+
+wait just kidding wih @jit and cupy (it threw a bunch of warnings)
+No, actually it fell back to normal python so this is just cupy
+use (nopython = True) so it doesn't excecute on normal python
+Time:  211.1637260913849
+
+ran with numpy and @jit but made (parallel=True). Idk why it took forever
+Time:  282.1278233528137
+
+Implemented parallel forloops by doing 'numba.prange(n)' in the for loop and calling
+@njit(parallel=True). Slightly slower than just calling @jit.
+-   I think the @jit does more optimizing, just does it better than individual implemntation of the for loop
+Time:  2.6436781883239746
+
+Gonna try to run this on the GPU...
+-   This is really hard...
