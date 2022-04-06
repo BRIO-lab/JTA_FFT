@@ -32,6 +32,7 @@ def main():
             else:
                 NFD = JTA_FFT(cal)
                 NFD.create_nfd_library(stl_path)
+                NFD.print_library(0,0.1,200)
                 NFD.save_nfd_library(NFD_DIR + stl_name)
                 del(NFD)
 
