@@ -21,6 +21,7 @@ from rotation_utility import *
 import time 
 import nvtx
 import scipy.interpolate as si
+import open3d as o3d
 # TODO: look into vtk-m
 
 
@@ -944,3 +945,7 @@ class JTA_FFT():
 
         # Calculate result
         return np.array(si.splev(u, (kv,cv.T,degree))).T
+    
+    def open3d_projection(self,stl):
+        vis = o3d.visualization.Visualizer()
+        mesh = o3d.io.read_tri
