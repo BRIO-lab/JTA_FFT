@@ -8,7 +8,7 @@ def main():
     
     
     HOME_DIR = "C:/Datasets_FemCleaned/"
-    study_list = ["Actiyas","Ghent", "GMK", "Toshi"]
+    study_list = ["GMK"]
     
     for study in study_list:
         study_dir = HOME_DIR + "/" + study

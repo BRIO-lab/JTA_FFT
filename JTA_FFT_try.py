@@ -3,9 +3,8 @@
 
 # Imports
 # from typing import OrderedDict
-from numpy.fft.helper import fftshift
-from numpy.lib.nanfunctions import _nansum_dispatcher
-# from torch._C import float32, uint8, unify_type_list
+#from numpy.fft.helper import fftshift
+#from numpy.lib.nanfunctions import _nansum_dispatcher
 from PIL import Image
 import vtk
 import numpy as np
@@ -16,17 +15,16 @@ from scipy.interpolate import splprep, splev
 import matplotlib.pyplot as plt
 import pickle
 from skimage import io
-import torch
-from torch import nn as nn
-from torch import optim as optim
-from torchvision import datasets, transforms, models
-#from pose_hrnet_modded_in_notebook import PoseHighResolutionNet
 from collections import OrderedDict
 import os
-#from JTA_FFT_dataset import *
 from rotation_utility import *
-from numba import jit
+import time 
+import nvtx
+import scipy.interpolate as si
+import open3d as o3d
 # TODO: look into vtk-m
+
+
 class JTA_FFT():
     
     
@@ -42,10 +40,10 @@ class JTA_FFT():
         self.xrotinc = 3
         self.yrotmax = 30
         self.yrotinc = 3
-
+        self.use_splprep = False
         # Image Size
         self.imsize = 1024
-
+        
         # Load in calibration file and check for proper formatting
         cal_data = np.loadtxt(CalFile, skiprows=1)
         self.CalFile = CalFile
@@ -101,7 +99,7 @@ class JTA_FFT():
         self.isc = isc
         self.fx = fx
 
-    
+    @nvtx.annotate("create_projection", color = "purple")
     def create_projection(self, STLFile,renWin, renderer, transformFilter, stl_mapper, xr,yr,zr, translation = None):
         # Takes in a path to an STL model, and generates a contour library based on it.
         # This saves the generated rotation indices to self, and returns the x and y arrays of contours. 
@@ -136,6 +134,7 @@ class JTA_FFT():
 
     # Create for-loop to run through each of the rotation combinations
     # Transform the STL model based on the current rotation
+        rng_vtk_proj = nvtx.start_range(message= "vtk_projection")
         transform = vtk.vtkTransform()
         transform.PostMultiply()
         transform.Scale(self.isc,self.isc,self.isc)
@@ -158,11 +157,15 @@ class JTA_FFT():
         renWin.AddRenderer(renderer)
         renWin.SetSize(self.imsize,self.imsize)
         renWin.Render()
+        nvtx.end_range(rng_vtk_proj)
             # nder the scene into a numpy array for openCV processing
+        rng_vtk_image = nvtx.start_range(message="vtk_image_creation")
         winToIm = vtk.vtkWindowToImageFilter()
         winToIm.SetInput(renWin)
         winToIm.Update()
         vtk_image = winToIm.GetOutput()
+        nvtx.end_range(rng_vtk_image)
+        rng_image_processing = nvtx.start_range(message = "image processing")
         width, height, channels = vtk_image.GetDimensions()
         vtk_array = vtk_image.GetPointData().GetScalars()
         components = vtk_array.GetNumberOfComponents()
@@ -177,7 +180,9 @@ class JTA_FFT():
         contours, hierarchy = cv2.findContours(binary,
                                                cv2.RETR_EXTERNAL,
                                                cv2.CHAIN_APPROX_NONE)
+        nvtx.end_range(rng_image_processing)
         # Loop through the contours to only grab the larges
+        rng_interp = nvtx.start_range(message = "interpolation")
         for contour in contours:
             x,y = contour.T
             
@@ -185,18 +190,22 @@ class JTA_FFT():
             x = x.tolist()[0]
             y = y.tolist()[0]
             
+            
             if len(x) > 200:
-            # Resample contour in nsamp equispaced increments using spline interpolation
-            # https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.interpolate.splprep.html
-                tck, u = splprep([x,y], u=None, s=1.0, per=1)
-            
-            # https://docs.scipy.org/doc/numpy-1.10.1/reference/generated/numpy.linspace.html
-                u_new = np.linspace(u.min(), u.max(), self.nsamp)
-            
-            # https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.interpolate.splev.html
-                x_new, y_new = splev(u_new, tck, der=0)
+                if self.use_splprep:
+                    # Resample contour in nsamp equispaced increments using spline interpolation
+                    # https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.interpolate.splprep.html
+                    tck, u = splprep([x,y], u=None, s=1.0, per=1)
                 
+                    # https://docs.scipy.org/doc/numpy-1.10.1/reference/generated/numpy.linspace.html
+                    u_new = np.linspace(u.min(), u.max(), self.nsamp)
                 
+                    # https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.interpolate.splev.html
+                    x_new, y_new = splev(u_new, tck, der=0)
+                else:
+                    cv = np.array([x,y])
+                    p = self.bspline(cv.T,periodic=True)
+                    x_new,y_new = p.T
             # Convert it back to numpy format for opencv to be able to display it
                 #fig, ax = plt.subplots(figsize = (10,10))
                 #plt.plot(x_new,self.imsize-y_new)
@@ -208,10 +217,12 @@ class JTA_FFT():
             else:
                 x_new = 0
                 y_new = 0
-        
+            
+        nvtx.end_range(rng_interp)
         return x_new, y_new
     
      
+    @nvtx.annotate("create_NFD_from_contour", color = "red")
     def create_NFD_from_contour(self, x_vals, y_vals):
         '''
         This function takes a series of [x,y] values and converts them into a single FFT representation
@@ -233,10 +244,13 @@ class JTA_FFT():
         # take the FFT of the input contour
         # We subtract v_vals from imsize because we are correcting for the element locations of a pixel in an image
         # this creates a 1D complex array using x and y values
-        fcoord = np.fft.fft(
-            (x_vals + (self.imsize - y_vals)*1j),
-            nsamp
-        )
+        #TODO: can this be run in parallel
+        #TODO: see if this runs in normal python
+        with nvtx.annotate("fft call", color="blue"): # running in normal python?
+            fcoord = np.fft.fft(
+                (x_vals + (self.imsize - y_vals)*1j),
+                nsamp
+            )
         
         
 
@@ -298,6 +312,7 @@ class JTA_FFT():
         return centroid, magnitude, angle, NFD, m_k
 
      
+    @nvtx.annotate("shift", color = "blue") # i dont think this one is taking long at all, just going to toss it here in case
     def shift(self,nfd):
         '''
         This replaces the np.fft.fftshift due to issues with the shifting parameters
@@ -306,6 +321,7 @@ class JTA_FFT():
         return np.roll(nfd, shift_amount)
     
      
+    @nvtx.annotate("ishift", color = "blue")
     def ishift(self,nfd):
         '''
         This replaces np.fft.ifftshift based on our needs (off-by-one)
@@ -314,6 +330,7 @@ class JTA_FFT():
         return np.roll(nfd, shift_amount)
     
      
+    @nvtx.annotate("create_nfd_library", color = "green")
     def create_nfd_library(self, STLFile):
         '''
         This function creates an NFD library based on the STL and rotation indices that have been specified
@@ -340,7 +357,8 @@ class JTA_FFT():
                 rot_indices[j,k,0] = xr
                 rot_indices[j,k,1] = yr
 
-                
+                # Should these get wrapped in the profiler also?
+                # Does the time from the initial profiler add the time from each of these calls as well? Is it nested?
                 xval, yval = self.create_projection(STLFile, renWin, renderer, transformFilter, stl_mapper, xr, yr, 0)
                 cent,mag,ang,nfd,mk = self.create_NFD_from_contour(xval,yval)
                 centroid_library[j,k] = cent
@@ -354,7 +372,8 @@ class JTA_FFT():
         self.angle_library = angle_library
         self.NFD_library = NFD_library
 
-     
+    # probably not going to be running this because the data is a bit too hefty to add to the hipergator system.
+    @nvtx.annotate("estimate_pose", color = "orange")
     def estimate_pose(self,instance):
         '''
         Given an input NFD instance, this will determine the pose
@@ -365,7 +384,7 @@ class JTA_FFT():
 
         dist = np.empty([xspan, yspan])
 
-        # We have to divide by the nsamp because of the noramlization method used in the FFT
+        # We have to divide by the nsamp because of the normalization method used in the FFT
 
         centroid_library = self.centroid_library / self.nsamp
         centroid_instance = instance["centroid"] / self.nsamp
@@ -478,6 +497,7 @@ class JTA_FFT():
         return x_est[0], y_est[0], z_est_corr[0], zr, xr, yr
 
      
+    @nvtx.annotate("save_nfd_library", color = "red")
     def save_nfd_library(self,filename):
         """ 
             Saves the necessary library variables into a dict for easier access after unpickling.
@@ -515,7 +535,8 @@ class JTA_FFT():
         except FileNotFoundError:
             print("Error! The file you are trying to load either does not exist, or does not exist at this location: ", pickle_path)
 
-     
+    
+    @nvtx.annotate("extract_contour_from_image", color = "green")
     def extract_contour_from_image(self, image):
         '''
         Extract the contour from a loaded image
@@ -550,6 +571,7 @@ class JTA_FFT():
 
                 # Resample contour in nsamp equispaced increments using spline interpolation
                 # https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.interpolate.splprep.html
+                
                 tck, u = splprep([x,y], u=None, s=1.0, per=1)
                 # https://docs.scipy.org/doc/numpy-1.10.1/reference/generated/numpy.linspace.html
                 u_new = np.linspace(u.min(), u.max(), self.nsamp)
@@ -566,7 +588,8 @@ class JTA_FFT():
 
         return x_new, y_new    
 
-     
+    
+    @nvtx.annotate("set_visualization_scene", color = "blue")
     def set_visualization_scene(self, STLFile):
         plt.clf()
 
@@ -645,6 +668,7 @@ class JTA_FFT():
         return renWin, renderer, transformFilter, stl_mapper
     
     
+    @nvtx.annotate("create_single_projection", color = "purple")
     def create_single_projection(self,STLFile, xr,yr,zr, translate = None):
 
         renWin, renderer, transformFilter, stl_mapper = self.set_visualization_scene(STLFile)
@@ -652,6 +676,7 @@ class JTA_FFT():
         return self.create_projection(STLFile, renWin, renderer, transformFilter, stl_mapper, xr, yr, zr, translate)
     
      
+    @nvtx.annotate("create_single_instance", color = "orange")
     def create_single_instance(self, STLFile, xr, yr, zr, translate = None):
 
         x, y = self.create_single_projection(STLFile, xr, yr, zr, translate)
@@ -667,7 +692,8 @@ class JTA_FFT():
         }
         return instance
 
-     
+     # TODO: make some of the different colors for better visualization
+    @nvtx.annotate("pose_from_segmentation", color = "purple")
     def pose_from_segmentation(self,image):
         '''
         This will take in the path to an image and return the pose at that specific value
@@ -847,13 +873,17 @@ class JTA_FFT():
                 x = inv.real*scale + x_cent
                 y = inv.imag*scale + y_cent
 
-                ax.plot(x,y, linewidth = 4)
-                ax.plot(clock_x, clock_y, linewidth = 2, color = 'black')
-                ax.plot(x_cent, y_cent, marker = "x", color = "black", markersize = 10)
+                #ax.plot(x,y, linewidth = 4)
+                ax.fill(x,y)
+
+                #ax.plot(clock_x, clock_y, linewidth = 2, color = 'black')
+                #ax.plot(x_cent, y_cent, marker = "x", color = "black", markersize = 10)
                 ax.set_xlabel("X-rotation", size = 35)
                 plt.xticks(fontsize = 25)
                 ax.set_ylabel("Y-rotation", size = 35)
                 plt.yticks(fontsize = 25)
+        
+        plt.show()
     
      
     def print_instance(self, instance, norm_coeff, clock_arm_length, scale):
@@ -875,3 +905,47 @@ class JTA_FFT():
         plt.xticks(fontsize = 25)
         ax.set_ylabel("Y-rotation", size = 35)
         plt.yticks(fontsize = 25)
+        
+    
+    def bspline(self,cv, n=128, degree=3, periodic=False):
+        """ Calculate n samples on a bspline
+
+            cv :      Array ov control vertices
+            n  :      Number of samples to return
+            degree:   Curve degree
+            periodic: True - Curve is closed
+                    False - Curve is open
+        """
+
+        # If periodic, extend the point array by count+degree+1
+        cv = np.asarray(cv)
+        count = len(cv)
+
+        if periodic:
+            factor, fraction = divmod(count+degree+1, count)
+            cv = np.concatenate((cv,) * factor + (cv[:fraction],))
+            count = len(cv)
+            degree = np.clip(degree,1,degree)
+
+        # If opened, prevent degree from exceeding count-1
+        else:
+            degree = np.clip(degree,1,count-1)
+
+
+        # Calculate knot vector
+        kv = None
+        if periodic:
+            kv = np.arange(0-degree,count+degree+degree-1)
+        else:
+            kv = np.clip(np.arange(count+degree+1)-degree,0,count-degree)
+
+        # Calculate query range
+        u = np.linspace(periodic,(count-degree),n)
+
+
+        # Calculate result
+        return np.array(si.splev(u, (kv,cv.T,degree))).T
+    
+    def open3d_projection(self,stl):
+        vis = o3d.visualization.Visualizer()
+        mesh = o3d.io.read_tri
