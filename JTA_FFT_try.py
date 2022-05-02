@@ -878,9 +878,9 @@ class JTA_FFT():
 
                 #ax.plot(clock_x, clock_y, linewidth = 2, color = 'black')
                 #ax.plot(x_cent, y_cent, marker = "x", color = "black", markersize = 10)
-                ax.set_xlabel("X-rotation", size = 35)
+                ax.set_xlabel("Implant X-rotation (°)", size = 35)
                 plt.xticks(fontsize = 25)
-                ax.set_ylabel("Y-rotation", size = 35)
+                ax.set_ylabel("Implant Y-rotation (°)", size = 35)
                 plt.yticks(fontsize = 25)
         
         plt.show()
