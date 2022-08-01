@@ -946,6 +946,3 @@ class JTA_FFT():
         # Calculate result
         return np.array(si.splev(u, (kv,cv.T,degree))).T
     
-    def open3d_projection(self,stl):
-        vis = o3d.visualization.Visualizer()
-        mesh = o3d.io.read_tri
